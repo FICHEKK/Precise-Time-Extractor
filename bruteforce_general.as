@@ -4,9 +4,6 @@ const array<string> modifyTypes = { "amount", "percentage" };
 
 Manager @m_Manager;
 
-// _the_ var
-bool m_useLiveDebugging = false;
-
 // bruteforce vars
 int m_bestTime; // best time the bf found so far, precise or not
 
@@ -638,9 +635,6 @@ void UpdateSettings() {
 
     // specify any conditions that could lead to a worse time here
     m_canAcceptWorseTimes = m_customStopTimeDelta > 0.0;
-
-
-    m_useLiveDebugging = GetVariableBool("kim_bf_use_live_debugging");
 }
 
 /* SIMULATION MANAGEMENT */
@@ -2027,7 +2021,7 @@ void BruteforceSettingsWindow() {
     /* custom stop time */
     UI::PushItemWidth(180);
     // m_customStopTimeDeltaUseOnlyOnce
-    if (!m_useLiveDebugging || !m_Manager.m_bfController.active) {
+    if (true || !m_Manager.m_bfController.active) {
         bool previousCustomStopTimeDeltaUseOnlyOnce = m_customStopTimeDeltaUseOnlyOnce;
         m_customStopTimeDeltaUseOnlyOnce = UI::CheckboxVar("Use Custom Stop Time Delta Only Once", "kim_bf_custom_stop_time_delta_use_only_once");
         // helper var for m_customStopTimeDeltaUseOnlyOnce
@@ -2100,53 +2094,6 @@ void BruteforceSettingsWindow() {
 
     // specify any conditions that could lead to a worse time here
     m_canAcceptWorseTimes = m_customStopTimeDelta > 0.0;
-
-
-
-
-
-
-    /* START OF LIVE DEBUGGING */
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
-    UI::Text("Live Debugging");
-    UI::TextDimmed("This allows to view and control internal variables of the bruteforce while it is running. While debugging is turned on, access to certain settings variables will be disabled. This currently an early prototype and offers support only for the internal flag which checks if the custom stop time delta was reached once. What's the use case??? Figure it out yourself :) (Hint: lets just say changing permanent settings variables during bruteforce isn't always the best idea)");
-    UI::Dummy(vec2(0, 15));
-
-    m_useLiveDebugging = UI::CheckboxVar("Activate", "kim_bf_use_live_debugging");
-    if (!m_useLiveDebugging) {
-        return;
-    }
-
-    if (!m_Manager.m_bfController.active) {
-        UI::TextDimmed("Live Debugging is only available while the bruteforce is running.");
-        UI::Dummy(vec2(0, 15));
-        return;
-    }
-
-    
-    UI::Dummy(vec2(0, 30));
-
-    // control internal variables
-    UI::PushItemWidth(180);
-    UI::Text("m_customStopTimeDeltaIsIgnored: " + (m_customStopTimeDeltaIsIgnored ? "true" : "false"));
-    UI::SameLine();
-    if (UI::Button("Reset##m_customStopTimeDeltaIsIgnored", vec2(60, 0))) {
-        m_customStopTimeDeltaIsIgnored = false;
-    }
-
-
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
-
-
-
-
-
 }
 
 
@@ -2207,8 +2154,6 @@ void Main() {
     RegisterVariable("kim_bf_logging_interval", 200.0);
 
     RegisterVariable("kim_bf_worse_result_acceptance_probability", 1.0f);
-
-    RegisterVariable("kim_bf_use_live_debugging", false);
 
     UpdateSettings();
 
