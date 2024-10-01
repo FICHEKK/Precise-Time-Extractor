@@ -37,9 +37,6 @@ uint m_modifySteeringMaxHoldTime;
 uint m_modifyAccelerationMaxHoldTime;
 uint m_modifyBrakeMaxHoldTime;
 
-uint m_modifySteeringMinDiff;
-uint m_modifySteeringMaxDiff;
-
 // TODO: implement
 // bool m_modifyOnlyExistingInputs;
 
@@ -366,13 +363,6 @@ void UpdateSettings() {
     SetVariable("kim_bf_modify_brake_min_hold_time", m_modifyBrakeMinHoldTime);
     SetVariable("kim_bf_modify_brake_max_hold_time", m_modifyBrakeMaxHoldTime);
 
-    // steering diff
-	m_modifySteeringMinDiff = uint(Math::Clamp(int(GetVariableDouble("kim_bf_modify_steering_min_diff")), 1, 131072));
-    m_modifySteeringMaxDiff = uint(Math::Clamp(int(GetVariableDouble("kim_bf_modify_steering_max_diff")), 1, 131072));
-    m_modifySteeringMinDiff = Math::Min(m_modifySteeringMinDiff, m_modifySteeringMaxDiff);
-    SetVariable("kim_bf_modify_steering_min_diff", m_modifySteeringMinDiff);
-    SetVariable("kim_bf_modify_steering_max_diff", m_modifySteeringMaxDiff);
-
     if (@simManager != null && m_Manager.m_bfController.active) {
         m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
     }
@@ -381,9 +371,6 @@ void UpdateSettings() {
     m_useInfoLogging = GetVariableBool("kim_bf_use_info_logging");
     m_useIterLogging = GetVariableBool("kim_bf_use_iter_logging");
     m_loggingInterval = Math::Clamp(uint(GetVariableDouble("kim_bf_logging_interval")), 1, 1000);
-
-
-    /* helper vars */
 
     // specify any conditions that could lead to a worse time here
     m_canAcceptWorseTimes = false;
@@ -704,6 +691,7 @@ class BruteforceController {
 
             // we either modify an existing value or add a new one
             // we do this until we have reached the max amount of modifications
+			uint modifySteeringMaxDiff = 131072;
 
             // steering
             while (steerValuesModified < maxSteeringModifyAmount) {
@@ -715,7 +703,7 @@ class BruteforceController {
                 // if there is no value at that time, add a new one
                 if (modifyIndex.Length == 0) {
                     // add a new value
-                    int newValue = Math::Rand(-m_modifySteeringMaxDiff/2, m_modifySteeringMaxDiff/2);
+                    int newValue = Math::Rand(-modifySteeringMaxDiff/2, modifySteeringMaxDiff/2);
                     inputBuffer.Add(modifyTime, InputType::Steer, newValue);
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
@@ -746,7 +734,7 @@ class BruteforceController {
                 } else {
                     // if there is a value at that time, modify it
                     int oldSteerValue = inputBuffer[modifyIndex[0]].Value.Analog;
-                    int newValue = oldSteerValue + Math::Rand(-Math::Min(65536 + oldSteerValue, m_modifySteeringMaxDiff), Math::Min(65536 - oldSteerValue, m_modifySteeringMaxDiff));
+                    int newValue = oldSteerValue + Math::Rand(-Math::Min(65536 + oldSteerValue, modifySteeringMaxDiff), Math::Min(65536 - oldSteerValue, modifySteeringMaxDiff));
                     inputBuffer[modifyIndex[0]].Value.Analog = newValue;
 
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
@@ -904,6 +892,7 @@ class BruteforceController {
 
             // TODO: remove later, for debugging
             uint modifiedvalues = 0;
+			uint modifySteeringMaxDiff = 131072;
 
             // steering
             for (uint modifyTime = modifySteeringMinTime; modifyTime < modifySteeringMaxTime; modifyTime += 10) {
@@ -917,7 +906,7 @@ class BruteforceController {
                 // if there is no value at that time, add a new one
                 if (modifyIndex.Length == 0) {
                     // add a new value
-                    int newValue = Math::Rand(-m_modifySteeringMaxDiff/2, m_modifySteeringMaxDiff/2);
+                    int newValue = Math::Rand(-modifySteeringMaxDiff/2, modifySteeringMaxDiff/2);
                     inputBuffer.Add(modifyTime, InputType::Steer, newValue);
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
@@ -947,7 +936,7 @@ class BruteforceController {
                 } else {
                     // if there is a value at that time, modify it
                     int oldSteerValue = inputBuffer[modifyIndex[0]].Value.Analog;
-                    int newValue = oldSteerValue + Math::Rand(-Math::Min(65536 + oldSteerValue, m_modifySteeringMaxDiff), Math::Min(65536 - oldSteerValue, m_modifySteeringMaxDiff));
+                    int newValue = oldSteerValue + Math::Rand(-Math::Min(65536 + oldSteerValue, modifySteeringMaxDiff), Math::Min(65536 - oldSteerValue, modifySteeringMaxDiff));
                     inputBuffer[modifyIndex[0]].Value.Analog = newValue;
 
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
@@ -1573,39 +1562,8 @@ void BruteforceSettingsWindow() {
     UI::Separator();
     UI::Dummy(vec2(0, 15));
 
-    UI::PushItemWidth(120);
-    UI::Text("Steering Modfication Value Range:");
-    int modifySteeringMinDiff = Math::Clamp(UI::SliderIntVar("Min Steer Diff          ", "kim_bf_modify_steering_min_diff", 1, 131072), 1, 131072);
-    SetVariable("kim_bf_modify_steering_min_diff", modifySteeringMinDiff);
-    if (uint(modifySteeringMinDiff) > m_modifySteeringMaxDiff) {
-        SetVariable("kim_bf_modify_steering_max_diff", modifySteeringMinDiff);
-    }
-    UI::SameLine();
-    int modifySteeringMaxDiff = Math::Clamp(UI::SliderIntVar("Max Steer Diff", "kim_bf_modify_steering_max_diff", 1, 131072), 1, 131072);
-    SetVariable("kim_bf_modify_steering_max_diff", modifySteeringMaxDiff);
-    if (uint(modifySteeringMaxDiff) < m_modifySteeringMinDiff) {
-        SetVariable("kim_bf_modify_steering_min_diff", modifySteeringMaxDiff);
-    }
-
-    m_modifySteeringMinDiff = modifySteeringMinDiff;
-    m_modifySteeringMaxDiff = modifySteeringMaxDiff;
-    UI::TextDimmed("You already know what this is");
-
     UI::PopItemWidth();
-    
-    /* TODO: implement
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
-    // kim_bf_modify_only_existing_inputs
-    m_modifyOnlyExistingInputs = UI::CheckboxVar("Modify Only Existing Inputs", "kim_bf_modify_only_existing_inputs");
-    */
-
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
+ 
     UI::Text("Fill Missing Inputs:");
     // kim_bf_use_fill_missing_inputs_steering, kim_bf_use_fill_missing_inputs_acceleration, kim_bf_use_fill_missing_inputs_brake
     if (!m_Manager.m_bfController.active) {
@@ -1679,9 +1637,6 @@ void Main() {
     RegisterVariable("kim_bf_modify_steering_max_hold_time", 0.0);
     RegisterVariable("kim_bf_modify_acceleration_max_hold_time", 0.0);
     RegisterVariable("kim_bf_modify_brake_max_hold_time", 0.0);
-
-    RegisterVariable("kim_bf_modify_steering_min_diff", 1.0);
-    RegisterVariable("kim_bf_modify_steering_max_diff", 131072.0);
 
     RegisterVariable("kim_bf_use_fill_missing_inputs_steering", false);
     RegisterVariable("kim_bf_use_fill_missing_inputs_acceleration", false);
