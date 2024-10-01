@@ -37,13 +37,6 @@ uint m_modifySteeringMaxHoldTime;
 uint m_modifyAccelerationMaxHoldTime;
 uint m_modifyBrakeMaxHoldTime;
 
-// TODO: implement
-// bool m_modifyOnlyExistingInputs;
-
-bool m_useFillMissingInputsSteering;
-bool m_useFillMissingInputsAcceleration;
-bool m_useFillMissingInputsBrake;
-
 bool m_useInfoLogging;
 bool m_useIterLogging;
 uint m_loggingInterval;
@@ -458,12 +451,6 @@ class BruteforceController {
         }
 
         m_targetId = targetId;
-
-
-        // fill missing inputs
-        m_useFillMissingInputsSteering = GetVariableBool("kim_bf_use_fill_missing_inputs_steering");
-        m_useFillMissingInputsAcceleration = GetVariableBool("kim_bf_use_fill_missing_inputs_acceleration");
-        m_useFillMissingInputsBrake = GetVariableBool("kim_bf_use_fill_missing_inputs_brake");
     }
     
     void StartInitialPhase() {
@@ -508,9 +495,6 @@ class BruteforceController {
         SetBruteforceVariables(simManager);
         UpdateSettings();
 
-        // one time variables that cannot be changed during simulation
-        FillMissingInputs(simManager);
-
         m_phase = BFPhase::Initial;
         m_originalSimulationStates = array<SimulationState@>();
         m_originalInputEvents.Clear();
@@ -530,127 +514,6 @@ class BruteforceController {
 
         // set the simulation time limit to make the game quit the simulation right away, or else we'll have to wait all the way until the end of the replay..
         simManager.SetSimulationTimeLimit(0.0);
-    }
-
-    void FillMissingInputs(SimulationManager@ simManager) {
-        // fill in a steering/acceleration/brake value for next tick if it is empty, using the previous tick's value
-        TM::InputEventBuffer@ inputBuffer = simManager.InputEvents;
-        // to check a input type
-        EventIndices actionIndices = inputBuffer.EventIndices;
-
-        // steering
-        if (m_useFillMissingInputsSteering) {
-            auto originalSteeringValuesIndices = simManager.InputEvents.Find(-1, InputType::Steer);
-            array<uint> originalSteeringValues = array<uint>();
-            for (uint i = 0; i < originalSteeringValuesIndices.Length; i++) {
-                originalSteeringValues.Add(inputBuffer[originalSteeringValuesIndices[i]].Value.Analog);
-            }
-            auto originalSteeringTimes = array<uint>();
-            for (uint i = 0; i < originalSteeringValuesIndices.Length; i++) {
-                originalSteeringTimes.Add((inputBuffer[originalSteeringValuesIndices[i]].Time - 100010) / 10);
-            }
-
-            int minTime = 0;
-            int maxTime = (simManager.EventsDuration - 10) / 10;
-
-            // if no steering occurred at the start, add steering value of 0 to start
-            if (originalSteeringTimes.Length == 0 || originalSteeringTimes.Length > 0 && originalSteeringTimes[0] != 0) {
-                originalSteeringTimes.InsertAt(0, 0);
-                originalSteeringValues.InsertAt(0, 0);
-                // also manually add the first steering value to the input buffer
-                inputBuffer.Add(0, InputType::Steer, 0);
-            }
-
-            int currentOriginalSteeringTimesIndex = originalSteeringTimes.Length - 1;
-
-            // iterate through all the times and fill in the empty steering values with the previous steering value
-            for (int i = maxTime; i >= minTime; i--) {
-                if (uint(i) > originalSteeringTimes[currentOriginalSteeringTimesIndex]) {
-                    inputBuffer.Add(i * 10, InputType::Steer, originalSteeringValues[currentOriginalSteeringTimesIndex]);
-                } else {
-                    currentOriginalSteeringTimesIndex--;
-                    if (currentOriginalSteeringTimesIndex < 0) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (m_useFillMissingInputsAcceleration) {
-            // acceleration
-            auto originalAccelerationValuesIndices = simManager.InputEvents.Find(-1, InputType::Up);
-            array<uint> originalAccelerationValues = array<uint>();
-            for (uint i = 0; i < originalAccelerationValuesIndices.Length; i++) {
-                originalAccelerationValues.Add(inputBuffer[originalAccelerationValuesIndices[i]].Value.Binary == false ? 0 : 1);
-            }
-            auto originalAccelerationTimes = array<uint>();
-            for (uint i = 0; i < originalAccelerationValuesIndices.Length; i++) {
-                originalAccelerationTimes.Add((inputBuffer[originalAccelerationValuesIndices[i]].Time - 100010) / 10);
-            }
-
-            int minTime = 0;
-            int maxTime = (simManager.EventsDuration - 10) / 10;
-            
-            // if no acceleration occurred at the start, add acceleration value of 0 to start
-            if (originalAccelerationTimes.Length == 0 || originalAccelerationTimes.Length > 0 && originalAccelerationTimes[0] != 0) {
-                originalAccelerationTimes.InsertAt(0, 0);
-                originalAccelerationValues.InsertAt(0, 0);
-                // also manually add the first acceleration value to the input buffer
-                inputBuffer.Add(0, InputType::Up, 0);
-            }
-
-            int currentOriginalAccelerationTimesIndex = originalAccelerationTimes.Length - 1;
-
-            // iterate through all the times and fill in the empty acceleration values with the previous acceleration value
-            for (int i = maxTime; i >= minTime; i--) {
-                if (uint(i) > originalAccelerationTimes[currentOriginalAccelerationTimesIndex]) {
-                    inputBuffer.Add(i * 10, InputType::Up, originalAccelerationValues[currentOriginalAccelerationTimesIndex]);
-                } else {
-                    currentOriginalAccelerationTimesIndex--;
-                    if (currentOriginalAccelerationTimesIndex < 0) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (m_useFillMissingInputsBrake) {
-            // brake
-            auto originalBrakeValuesIndices = simManager.InputEvents.Find(-1, InputType::Down);
-            array<uint> originalBrakeValues = array<uint>();
-            for (uint i = 0; i < originalBrakeValuesIndices.Length; i++) {
-                originalBrakeValues.Add(inputBuffer[originalBrakeValuesIndices[i]].Value.Binary == false ? 0 : 1);
-            }
-            auto originalBrakeTimes = array<uint>();
-            for (uint i = 0; i < originalBrakeValuesIndices.Length; i++) {
-                originalBrakeTimes.Add((inputBuffer[originalBrakeValuesIndices[i]].Time - 100010) / 10);
-            }
-
-            int minTime = 0;
-            int maxTime = (simManager.EventsDuration - 10) / 10;
-
-            // if no brake occurred at the start, add brake value of 0 to start
-            if (originalBrakeTimes.Length == 0 || originalBrakeTimes.Length > 0 && originalBrakeTimes[0] != 0) {
-                originalBrakeTimes.InsertAt(0, 0);
-                originalBrakeValues.InsertAt(0, 0);
-                // also manually add the first brake value to the input buffer
-                inputBuffer.Add(0, InputType::Down, 0);
-            }
-
-            int currentOriginalBrakeTimesIndex = originalBrakeTimes.Length - 1;
-
-            // iterate through all the times and fill in the empty brake values with the previous brake value
-            for (int i = maxTime; i >= minTime; i--) {
-                if (uint(i) > originalBrakeTimes[currentOriginalBrakeTimesIndex]) {
-                    inputBuffer.Add(i * 10, InputType::Down, originalBrakeValues[currentOriginalBrakeTimesIndex]);
-                } else {
-                    currentOriginalBrakeTimesIndex--;
-                    if (currentOriginalBrakeTimesIndex < 0) {
-                        break;
-                    }
-                }
-            }
-        }
     }
 
     void PrintInputBuffer() {
@@ -1563,30 +1426,6 @@ void BruteforceSettingsWindow() {
     UI::Dummy(vec2(0, 15));
 
     UI::PopItemWidth();
- 
-    UI::Text("Fill Missing Inputs:");
-    // kim_bf_use_fill_missing_inputs_steering, kim_bf_use_fill_missing_inputs_acceleration, kim_bf_use_fill_missing_inputs_brake
-    if (!m_Manager.m_bfController.active) {
-        m_useFillMissingInputsSteering =  UI::CheckboxVar("Fill Missing Steering Input", "kim_bf_use_fill_missing_inputs_steering");
-        m_useFillMissingInputsAcceleration = UI::CheckboxVar("Fill Missing Acceleration Input", "kim_bf_use_fill_missing_inputs_acceleration");
-        m_useFillMissingInputsBrake = UI::CheckboxVar("Fill Missing Brake Input", "kim_bf_use_fill_missing_inputs_brake");
-    } else {
-        UI::Text("Fill Missing Steering Input: " + m_useFillMissingInputsSteering);
-        UI::Text("Fill Missing Acceleration Input: " + m_useFillMissingInputsAcceleration);
-        UI::Text("Fill Missing Brake Input: " + m_useFillMissingInputsBrake);
-    }
-    UI::TextDimmed("Example for steering: Timestamps with inputs will be filled with");
-    UI::TextDimmed("existing values resulting in more values that can be changed.");
-    UI::TextDimmed("1.00 steer 3456 -> 1.00 steer 3456");
-    UI::TextDimmed("1.30 steer 1921     1.01 steer 3456");
-    UI::TextDimmed("                                1.02 steer 3456");
-    UI::TextDimmed("                                ...");
-    UI::TextDimmed("                                1.30 steer 1921");
-
-
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
 
     // kim_bf_use_info_logging
     m_useInfoLogging = UI::CheckboxVar("Log Info", "kim_bf_use_info_logging");
@@ -1637,10 +1476,6 @@ void Main() {
     RegisterVariable("kim_bf_modify_steering_max_hold_time", 0.0);
     RegisterVariable("kim_bf_modify_acceleration_max_hold_time", 0.0);
     RegisterVariable("kim_bf_modify_brake_max_hold_time", 0.0);
-
-    RegisterVariable("kim_bf_use_fill_missing_inputs_steering", false);
-    RegisterVariable("kim_bf_use_fill_missing_inputs_acceleration", false);
-    RegisterVariable("kim_bf_use_fill_missing_inputs_brake", false);
 
     RegisterVariable("kim_bf_use_info_logging", true);
     RegisterVariable("kim_bf_use_iter_logging", true);
