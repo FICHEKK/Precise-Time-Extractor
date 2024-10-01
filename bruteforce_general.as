@@ -1,9 +1,16 @@
+// How to use:
+// 1. Convert all of your replay .Gbx files to TMI input files.
+// 2. Rename all of your TMI input files so they have the same name, but have increasing number suffix ("track0.txt", "track1.txt", "track2.txt"...).
+// 3. Enter name of the track should be extracted ("track").
+// 4. Enter from which index to which index to extract from (if min index = 0 and max index = 2, extract will be done for "track0.txt", "track1.txt" and "track2.txt").
+
 Manager @m_Manager;
 
 bool m_wasBaseRunFound = false;
 int m_bestTime;
 int m_bestTimeEver;
 string m_resultFileName;
+int currentReplayIndex = 0;
 
 string DecimalFormatted(float number, int precision = 10) {
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
@@ -163,7 +170,7 @@ class BruteforceController {
         PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
         PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
 
-        m_resultFileName = GetVariableString("kim_bf_result_file_name");
+        m_resultFileName = GetVariableString("fic_pte_file_name");
     }
     
     void StartInitialPhase() {
@@ -185,10 +192,8 @@ class BruteforceController {
     }
 
     void OnSimulationBegin(SimulationManager@ simManager) {
-        active = GetVariableString("controller") == "kim_bf_controller";
-        if (!active) {
-            return;
-        }
+        active = GetVariableString("controller") == "fic_pte";
+        if (!active) return;
 
         print("[AS] Starting bruteforce..");
 
@@ -208,17 +213,13 @@ class BruteforceController {
     }
 
     void OnSimulationEnd(SimulationManager@ simManager) {
-        if (!active) {
-            return;
-        }
+        if (!active) return;
+        
         print("[AS] Bruteforce finished");
         active = false;
 
         m_originalInputEvents.Clear();
         m_originalSimulationStates.Clear();
-
-
-        // set the simulation time limit to make the game quit the simulation right away, or else we'll have to wait all the way until the end of the replay..
         simManager.SetSimulationTimeLimit(0.0);
     }
 
@@ -253,9 +254,7 @@ class BruteforceController {
     }
 
     void OnSimulationStep(SimulationManager@ simManager) {
-        if (!active) {
-            return;
-        }
+        if (!active) return;
 
         BFEvaluationInfo info;
         info.Phase = m_phase;
@@ -421,9 +420,9 @@ void BruteforceSettingsWindow() {
 
     UI::PushItemWidth(150);
     if (!m_Manager.m_bfController.active) {
-        m_resultFileName = UI::InputTextVar("Result file name", "kim_bf_result_file_name");
+        m_resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
     } else {
-        UI::Text("Result file name " + m_resultFileName);
+        UI::Text("File name " + m_resultFileName);
     }
     UI::PopItemWidth();
 }
@@ -431,7 +430,7 @@ void BruteforceSettingsWindow() {
 
 void Main() {
     @m_Manager = Manager();
-    RegisterVariable("kim_bf_result_file_name", "result.txt");
+    RegisterVariable("fic_pte_file_name", "track");
     UpdateSettings();
     RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", BruteforceSettingsWindow);
 }
