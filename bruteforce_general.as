@@ -1,6 +1,3 @@
-// constants
-const array<string> targetNames = { "finish", "checkpoint", "trigger" };
-
 Manager @m_Manager;
 
 // bruteforce vars
@@ -25,14 +22,6 @@ uint m_iterationsCounter = 0; // iterations counter, used to update the iteratio
 float m_iterationsPerSecond = 0.0f; // iterations per second
 float m_lastIterationsPerSecondUpdate = 0.0f; // last time the iterations per second were updated
 
-
-/* enum definitions, because somehow we cant define enums inside a class */
-enum TargetType {
-    Finish,
-    Checkpoint,
-    Trigger
-}
-
 string DecimalFormatted(float number, int precision = 10) {
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
 }
@@ -52,23 +41,7 @@ namespace PreciseTime {
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
         int tickTime = simManager.TickTime;
 
-        bool targetReached = false;
-        switch (m_Manager.m_bfController.m_targetType) {
-            case TargetType::Finish:
-                targetReached = simManager.PlayerInfo.RaceFinished;
-                break;
-            case TargetType::Checkpoint:
-                targetReached = simManager.PlayerInfo.CurCheckpointCount == m_Manager.m_bfController.m_targetId;
-                break;
-            case TargetType::Trigger:
-            {
-                Trigger3D trigger = GetTriggerByIndex(m_Manager.m_bfController.m_targetId - 1);
-                // targetReached = trigger.ContainsPoint(simManager.Dyna.CurrentState.Location.Position);
-                targetReached = IsColliding(simManager, trigger);
-                break;
-            }
-        }
-
+        bool targetReached = simManager.PlayerInfo.RaceFinished;
         int maxTimeLimit = m_bestTime;
 
         if (targetReached) {
@@ -110,22 +83,7 @@ namespace PreciseTime {
     void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
         int tickTime = simManager.TickTime;
 
-        bool targetReached = false;
-        switch (m_Manager.m_bfController.m_targetType) {
-            case TargetType::Finish:
-                targetReached = simManager.PlayerInfo.RaceFinished;
-                break;
-            case TargetType::Checkpoint:
-                targetReached = simManager.PlayerInfo.CurCheckpointCount == m_Manager.m_bfController.m_targetId;
-                break;
-            case TargetType::Trigger:
-            {
-                Trigger3D trigger = GetTriggerByIndex(m_Manager.m_bfController.m_targetId - 1);
-                // targetReached = trigger.ContainsPoint(simManager.Dyna.CurrentState.Location.Position);
-                targetReached = IsColliding(simManager, trigger);
-                break;
-            }
-        }
+        bool targetReached = simManager.PlayerInfo.RaceFinished;
 
         // see previous usages of this variable for more info
         int maxTimeLimit = m_bestTime;
@@ -232,47 +190,6 @@ namespace PreciseTime {
 void UpdateSettings() {
     SimulationManager@ simManager = m_Manager.m_simManager;
 
-    // m_target, m_targetType, m_targetId. only check this when bruteforce is inactive when updating settings, the bruteforce controller will have
-    // additional checks for this by itself
-    if (@simManager == null || !m_Manager.m_bfController.active) {
-        // string for the target used for console settings
-        m_Manager.m_bfController.m_target = GetVariableString("kim_bf_target");
-        // target as enum for bruteforce
-        if (m_Manager.m_bfController.m_target == "finish") {
-            m_Manager.m_bfController.m_targetType = TargetType::Finish;
-        } else if (m_Manager.m_bfController.m_target == "checkpoint") {
-            m_Manager.m_bfController.m_targetType = TargetType::Checkpoint;
-        } else if (m_Manager.m_bfController.m_target == "trigger") {
-            m_Manager.m_bfController.m_targetType = TargetType::Trigger;
-        } else {
-            // reset it to finish if it was invalid
-            m_Manager.m_bfController.m_target = targetNames[0];
-            m_Manager.m_bfController.m_targetType = TargetType(0);
-            SetVariable("kim_bf_target", targetNames[0]);
-        }
-
-        // m_targetId
-        uint targetId = uint(Math::Max(GetVariableDouble("kim_bf_target_id"), 1.0));
-
-        // check if target id is valid
-        switch (m_Manager.m_bfController.m_targetType) {
-            case TargetType::Finish:
-                // no need to check anything
-                break;
-            case TargetType::Checkpoint:
-                // nothing can be done for checkpoints, we are not on a map
-                break; 
-            case TargetType::Trigger:
-                // we can check for triggers because those are built into TMI
-                if (targetId > GetTriggerIds().Length) {
-                    targetId = GetTriggerIds().Length;
-                }
-                break;
-        }
-        m_Manager.m_bfController.m_targetId = targetId;
-        SetVariable("kim_bf_target_id", targetId);
-    }
-
     if (@simManager != null && m_Manager.m_bfController.active) {
         m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
     }
@@ -314,60 +231,6 @@ class BruteforceController {
 
         // Bruteforce Variables
         m_resultFileName = GetVariableString("kim_bf_result_file_name");
-
-
-        // m_target, m_targetType, m_targetId
-        m_target = GetVariableString("kim_bf_target");
-        // target as enum for bruteforce
-        if (m_target == "finish") {
-            m_targetType = TargetType::Finish;
-        } else if (m_target == "checkpoint") {
-            m_targetType = TargetType::Checkpoint;
-        } else if (m_target == "trigger") {
-            m_targetType = TargetType::Trigger;
-        } else {
-            print("[AS] Invalid bruteforce target: " + m_target + ", stopping bruteforce..", Severity::Error);
-            OnSimulationEnd(simManager);
-            return;
-        }
-
-        // in case of checkpoint or trigger, the index of the target
-        uint targetId = uint(Math::Max(GetVariableDouble("kim_bf_target_id"), 1.0));
-
-        // check if target id is valid
-        switch (m_targetType) {
-            case TargetType::Finish:
-                // no need to check anything
-                break;
-            case TargetType::Checkpoint:
-            {
-                uint checkpointCount = simManager.PlayerInfo.Checkpoints.Length;
-                if (targetId > checkpointCount) {
-                    print("[AS] Checkpoint with target id " + targetId + " does not exist on this map, change the target id in settings to fix this issue. stopping bruteforce..", Severity::Error);
-                    OnSimulationEnd(simManager);
-                    return;
-                }
-                break;
-            }
-            case TargetType::Trigger:
-            {
-                uint triggerCount = GetTriggerIds().Length;
-                if (triggerCount == 0) {
-                    print("[AS] Cannot bruteforce for trigger target, no triggers were found. stopping bruteforce..", Severity::Error);
-                    OnSimulationEnd(simManager);
-                    return;
-                }
-                // if too high target id is specified, set to highest poss
-                if (targetId > triggerCount) {
-                    print("[AS] Trigger with target id " + targetId + " does not exist, change the target id in settings to fix this issue. stopping bruteforce..", Severity::Error);
-                    OnSimulationEnd(simManager);
-                    return;
-                }
-                break;
-            }
-        }
-
-        m_targetId = targetId;
     }
     
     void StartInitialPhase() {
@@ -604,11 +467,6 @@ class BruteforceController {
     bool active = false;
     BFPhase m_phase = BFPhase::Initial;
 
-    // initialized as "finish"
-    string m_target = targetNames[0];
-    TargetType m_targetType = TargetType(0);
-    uint m_targetId = 1; // used for checkpoint/trigger targets, id is index+1
-
     array<SimulationState@> m_originalSimulationStates = {};
     array<TM::InputEvent> m_originalInputEvents; 
 
@@ -686,71 +544,6 @@ void BruteforceSettingsWindow() {
     UI::Dummy(vec2(0, 15));
     UI::Separator();
     UI::Dummy(vec2(0, 15));
-
-    // m_target selectable
-    UI::PushItemWidth(120);
-    UI::Text("Target");
-    UI::SameLine();
-    
-    if (!m_Manager.m_bfController.active) {
-        m_Manager.m_bfController.m_target = GetVariableString("kim_bf_target");
-        if (UI::BeginCombo("##target", m_Manager.m_bfController.m_target)) {
-            for (uint i = 0; i < targetNames.Length; i++) {
-                bool isSelected = m_Manager.m_bfController.m_target == targetNames[i];
-                if (UI::Selectable(targetNames[i], isSelected)) {
-                    m_Manager.m_bfController.m_target = targetNames[i];
-                    SetVariable("kim_bf_target", targetNames[i]);
-                    m_Manager.m_bfController.m_targetType = TargetType(i);
-                }
-            }
-            UI::EndCombo();
-        }
-    } else {
-        UI::Text(m_Manager.m_bfController.m_target);
-    }
-
-    // if target is checkpoint or trigger, show index
-    if (m_Manager.m_bfController.m_targetType == TargetType::Checkpoint || m_Manager.m_bfController.m_targetType == TargetType::Trigger) {
-        UI::SameLine();
-        UI::Text("Index");
-        UI::SameLine();
-        if (!m_Manager.m_bfController.active) {
-            // target id is index+1, 0 will be used for invalid or unused in case of finish
-            uint targetId = uint(Math::Max(UI::InputIntVar("##targetid", "kim_bf_target_id", 1), 1));
-            // check if target id is valid
-            switch (m_Manager.m_bfController.m_targetType) {
-                case TargetType::Checkpoint:
-                    // we cant check for checkpoint count because we havent loaded a map, simple set the value, an error will be given on bruteforce start
-                    SetVariable("kim_bf_target_id", targetId);
-                    break;
-                case TargetType::Trigger:
-                {
-                    uint triggerCount = GetTriggerIds().Length;
-                    if (triggerCount == 0) {
-                        UI::Text("No triggers found. Make sure to add triggers");
-                    } else if (targetId > triggerCount) {
-                        targetId = triggerCount;
-                    }
-                    m_Manager.m_bfController.m_targetId = targetId;
-                    SetVariable("kim_bf_target_id", targetId);
-                    break;
-                }
-            }
-        } else {
-            UI::Text("" + m_Manager.m_bfController.m_targetId);
-        }
-    }
-
-    UI::PopItemWidth();
-    
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
-    UI::PushItemWidth(120);
-    UI::Text("Input Modifications:");
-    // can be a simple value based range amount or percentage based range
-    UI::SameLine();
     
     UI::PopItemWidth();
 
@@ -779,9 +572,6 @@ void Main() {
     @m_Manager = Manager();
 
     RegisterVariable("kim_bf_result_file_name", "result.txt");
-
-    RegisterVariable("kim_bf_target", targetNames[0]); // "finish" / "checkpoint" / "trigger"
-    RegisterVariable("kim_bf_target_id", 1.0); // id of target (index + 1), used for checkpoint/trigger
 
     RegisterVariable("kim_bf_use_info_logging", true);
     RegisterVariable("kim_bf_use_iter_logging", true);
