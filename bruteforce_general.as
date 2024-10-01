@@ -17,8 +17,6 @@ bool m_customStopTimeDeltaIsIgnored = false; // used for m_customStopTimeDeltaUs
 // settings vars
 string m_resultFileName;
 
-bool m_usePreciseTime;
-
 uint m_modifySteeringMinTime;
 uint m_modifyAccelerationMinTime;
 uint m_modifyBrakeMinTime;
@@ -503,9 +501,6 @@ void UpdateSettings() {
         SetVariable("kim_bf_target_id", targetId);
     }
 
-    // precise time
-    m_usePreciseTime = GetVariableBool("kim_bf_use_precise_time");
-
     // modify type
     m_modifyType = GetVariableString("kim_bf_modify_type");
 
@@ -602,11 +597,8 @@ void UpdateSettings() {
     m_customStopTimeDeltaUseOnlyOnce = GetVariableBool("kim_bf_custom_stop_time_delta_use_only_once");
     // custom stop time delta
     m_customStopTimeDelta = GetVariableDouble("kim_bf_custom_stop_time_delta");
-	if (!m_usePreciseTime) {
-		m_customStopTimeDelta = double(Math::Round(m_customStopTimeDelta * 100.0) * 10.0);
-	} else {
-		m_customStopTimeDelta = double(m_customStopTimeDelta * 1000.0);
-	}
+	m_customStopTimeDelta = double(m_customStopTimeDelta * 1000.0);
+
     // check if the m_customStopTimeDeltaUseOnlyOnce value has changed
     if (previousCustomStopTimeDeltaUseOnlyOnce != m_customStopTimeDeltaUseOnlyOnce) {
         m_customStopTimeDeltaIsIgnored = false;
@@ -1434,23 +1426,11 @@ class BruteforceController {
     }
 
     void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, BFEvaluationInfo&in info) {
-        if (m_usePreciseTime) {
-            PreciseTime::HandleSearchPhase(m_simManager, response, info);
-            return;
-        } else {
-            NormalTime::HandleSearchPhase(m_simManager, response, info);
-            return;
-        }
+        PreciseTime::HandleSearchPhase(m_simManager, response, info);
     }
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, BFEvaluationInfo&in info) {
-        if (m_usePreciseTime) {
-            PreciseTime::HandleInitialPhase(m_simManager, response, info);
-            return;
-        } else {
-            NormalTime::HandleInitialPhase(m_simManager, response, info);
-            return;
-        }
+        PreciseTime::HandleInitialPhase(m_simManager, response, info);
     }
 
     BFEvaluationResponse@ OnBruteforceStep(SimulationManager@ simManager, const BFEvaluationInfo&in info) {
@@ -1471,19 +1451,11 @@ class BruteforceController {
     void SaveSolutionToFile() {
         // m_commandList.Content = simManager.InputEvents.ToCommandsText();
         // only save if the time we found is the best time ever, currently also saves when an equal time was found and accepted
-        if (!m_usePreciseTime) {
-            if (m_bestTime == m_bestTimeEver) {
-                m_commandList.Content = "# Found time: " + m_bestTime + ", iterations: " + m_iterations + "\n";
-                m_commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-                m_commandList.Save(m_resultFileName);
-            }
-        } else {
-            if (PreciseTime::bestPreciseTime == PreciseTime::bestPreciseTimeEver) {
-                m_commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + ", iterations: " + m_iterations + "\n";
-                m_commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-                m_commandList.Save(m_resultFileName);
-            }
-        }
+        if (PreciseTime::bestPreciseTime == PreciseTime::bestPreciseTimeEver) {
+			m_commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + ", iterations: " + m_iterations + "\n";
+			m_commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
+			m_commandList.Save(m_resultFileName);
+		}
     }
 
     // informational functions
@@ -1495,11 +1467,7 @@ class BruteforceController {
         string message = "[AS] ";
 
         if (m_useInfoLogging) {
-            if (m_usePreciseTime) {
-                message += "best precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16);
-            } else {
-                message += "best time: " + Text::FormatInt(m_bestTime);
-            }
+            message += "best precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16);
         }
 
         if (m_useIterLogging) {
@@ -1671,20 +1639,7 @@ void BruteforceSettingsWindow() {
     }
 
     UI::PopItemWidth();
-
     
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-    
-    // precise time checkbox
-    UI::PushItemWidth(180);
-    m_usePreciseTime = UI::CheckboxVar("##precisetimeenabled", "kim_bf_use_precise_time");
-    UI::SameLine();
-    UI::Text("Use precise time");
-    
-    UI::PopItemWidth();
-
     UI::Dummy(vec2(0, 15));
     UI::Separator();
     UI::Dummy(vec2(0, 15));
@@ -2022,14 +1977,8 @@ void BruteforceSettingsWindow() {
     
     
     UI::SameLine();
-    // sec to hundreds, round, and then * 10 to milliseconds to conform game time
-    if (!m_usePreciseTime) {
-        m_customStopTimeDelta = double(Math::Round(m_customStopTimeDelta * 100.0) * 10.0);
-        UI::Text("Custom stop time delta  ( " + DecimalFormatted(m_customStopTimeDelta, 0) + " ms)");
-    } else {
-        UI::Text("Custom stop time delta ( " + DecimalFormatted(m_customStopTimeDelta, 7) + " sec)");
-        m_customStopTimeDelta = double(m_customStopTimeDelta * 1000.0);
-    }
+	UI::Text("Custom stop time delta ( " + DecimalFormatted(m_customStopTimeDelta, 7) + " sec)");
+	m_customStopTimeDelta = double(m_customStopTimeDelta * 1000.0);
 
     if (previousCustomStopTimeDelta != m_customStopTimeDelta) {
         if (@m_Manager.m_simManager != null && m_Manager.m_bfController.active) {
@@ -2083,8 +2032,6 @@ void Main() {
 
     RegisterVariable("kim_bf_target", targetNames[0]); // "finish" / "checkpoint" / "trigger"
     RegisterVariable("kim_bf_target_id", 1.0); // id of target (index + 1), used for checkpoint/trigger
-
-    RegisterVariable("kim_bf_use_precise_time", true);
 
     RegisterVariable("kim_bf_modify_steering_min_time", 0.0);
     RegisterVariable("kim_bf_modify_acceleration_min_time", 0.0);
