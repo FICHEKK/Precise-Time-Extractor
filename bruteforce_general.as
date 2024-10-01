@@ -16,10 +16,8 @@ bool m_canAcceptWorseTimes = false; // will become true if settings are set that
 // settings vars
 string m_resultFileName;
 
-uint m_modifySteeringMinTime;
 uint m_modifyAccelerationMinTime;
 uint m_modifyBrakeMinTime;
-uint m_modifySteeringMaxTime;
 uint m_modifyAccelerationMaxTime;
 uint m_modifyBrakeMaxTime;
 
@@ -319,12 +317,6 @@ void UpdateSettings() {
     m_modifyType = GetVariableString("kim_bf_modify_type");
 
     // input modification time range
-    m_modifySteeringMinTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_steering_min_time"))));
-    m_modifySteeringMaxTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_steering_max_time"))));
-    m_modifySteeringMinTime = Math::Min(m_modifySteeringMinTime, m_modifySteeringMaxTime);
-    SetVariable("kim_bf_modify_steering_min_time", m_modifySteeringMinTime);
-    SetVariable("kim_bf_modify_steering_max_time", m_modifySteeringMaxTime);
-
     m_modifyAccelerationMinTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_acceleration_min_time"))));
     m_modifyAccelerationMaxTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_acceleration_max_time"))));
     m_modifyAccelerationMinTime = Math::Min(m_modifyAccelerationMinTime, m_modifyAccelerationMaxTime);
@@ -715,9 +707,8 @@ class BruteforceController {
             m_originalInputEvents.Add(inputBuffer[i]);
         }
 
-        uint modifySteeringMinTime = Math::Max(0, m_modifySteeringMinTime);
+        uint modifySteeringMinTime = 0;
         uint modifySteeringMaxTime = m_bestTime;
-        modifySteeringMaxTime = m_modifySteeringMaxTime == 0 ? modifySteeringMaxTime : Math::Min(modifySteeringMaxTime, m_modifySteeringMaxTime);
 
         uint modifyAccelerationMinTime = Math::Max(0, m_modifyAccelerationMinTime);
         uint modifyAccelerationMaxTime = m_bestTime;
@@ -1426,31 +1417,12 @@ void BruteforceSettingsWindow() {
     UI::Separator();
     UI::Dummy(vec2(0, 15));
 
-    // kim_bf_modify_steering_min_time, kim_bf_modify_steering_max_time,
     // kim_bf_modify_acceleration_min_time, kim_bf_modify_acceleration_max_time,
     // kim_bf_modify_brake_min_time, kim_bf_modify_brake_max_time
     UI::PushItemWidth(180);
     UI::Text("Input Modifications Time Range:");
     UI::Dummy(vec2(0, 5));
-    UI::Text("Steering:");
-    UI::Text("Min Time");
-    UI::SameLine();
-    int modifySteeringMinTime = UI::InputTimeVar("##modifysteeringmintime", "kim_bf_modify_steering_min_time", 10);
-    if (uint(modifySteeringMinTime) > m_modifySteeringMaxTime) {
-        m_modifySteeringMaxTime = modifySteeringMinTime;
-        SetVariable("kim_bf_modify_steering_max_time", modifySteeringMinTime);
-    }
-    m_modifySteeringMinTime = modifySteeringMinTime;
-    UI::SameLine();
-    UI::Text("  Max Time");
-    UI::SameLine();
-    int modifySteeringMaxTime = UI::InputTimeVar("##modifysteeringmaxtime", "kim_bf_modify_steering_max_time", 10);
-    if (uint(modifySteeringMaxTime) < m_modifySteeringMinTime) {
-        m_modifySteeringMinTime = modifySteeringMaxTime;
-        SetVariable("kim_bf_modify_steering_min_time", modifySteeringMaxTime);
-    }
-    m_modifySteeringMaxTime = modifySteeringMaxTime;
-    UI::Dummy(vec2(0, 5));
+   
     UI::Text("Acceleration:");
     UI::Text("Min Time");
     UI::SameLine();
@@ -1774,10 +1746,8 @@ void Main() {
     RegisterVariable("kim_bf_target", targetNames[0]); // "finish" / "checkpoint" / "trigger"
     RegisterVariable("kim_bf_target_id", 1.0); // id of target (index + 1), used for checkpoint/trigger
 
-    RegisterVariable("kim_bf_modify_steering_min_time", 0.0);
     RegisterVariable("kim_bf_modify_acceleration_min_time", 0.0);
     RegisterVariable("kim_bf_modify_brake_min_time", 0.0);
-    RegisterVariable("kim_bf_modify_steering_max_time", 0.0);
     RegisterVariable("kim_bf_modify_acceleration_max_time", 0.0);
     RegisterVariable("kim_bf_modify_brake_max_time", 0.0);
 
