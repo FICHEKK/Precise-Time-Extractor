@@ -10,16 +10,6 @@ int m_bestTimeEver; // keeps track for the best time ever reached, useful for bf
 // settings vars
 string m_resultFileName;
 
-bool m_useInfoLogging;
-bool m_useIterLogging;
-uint m_loggingInterval;
-
-// info vars
-uint m_iterations = 0; // total iterations
-uint m_iterationsCounter = 0; // iterations counter, used to update the iterations per second
-float m_iterationsPerSecond = 0.0f; // iterations per second
-float m_lastIterationsPerSecondUpdate = 0.0f; // last time the iterations per second were updated
-
 string DecimalFormatted(float number, int precision = 10) {
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
 }
@@ -183,11 +173,6 @@ void UpdateSettings() {
     if (@simManager != null && m_Manager.m_bfController.active) {
         m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
     }
-
-    // logging
-    m_useInfoLogging = GetVariableBool("kim_bf_use_info_logging");
-    m_useIterLogging = GetVariableBool("kim_bf_use_iter_logging");
-    m_loggingInterval = Math::Clamp(uint(GetVariableDouble("kim_bf_logging_interval")), 1, 1000);
 }
 
 class BruteforceController {
@@ -200,11 +185,6 @@ class BruteforceController {
         m_wasBaseRunFound = false;
         m_bestTime = simManager.EventsDuration; // original time of the replay
         m_bestTimeEver = m_bestTime;
-
-        m_iterations = 0;
-        m_iterationsCounter = 0;
-        m_iterationsPerSecond = 0.0f;
-        m_lastIterationsPerSecondUpdate = 0.0f;
 
         // PreciseTime Variables
         PreciseTime::isEstimating = false;
@@ -219,16 +199,12 @@ class BruteforceController {
     }
     
     void StartInitialPhase() {
-        UpdateIterationsPerSecond(); // it aint really an iteration, but it kinda wont update the performance of the simulation if you happen to have a lot of initial phases
-
         m_phase = BFPhase::Initial;
         m_simManager.RewindToState(m_originalSimulationStates[m_rewindIndex]);
         m_originalSimulationStates.Resize(m_rewindIndex + 1);
     }
 
     void StartSearchPhase() {
-        UpdateIterationsPerSecond();
-
         m_phase = BFPhase::Search;
 
         RandomNeighbour();
@@ -236,8 +212,6 @@ class BruteforceController {
     }
 
     void StartNewIteration() {
-        UpdateIterationsPerSecond();
-
         // randomize the inputbuffers values
         RandomNeighbour();
         m_simManager.RewindToState(m_originalSimulationStates[m_rewindIndex]);
@@ -403,48 +377,10 @@ class BruteforceController {
         // m_commandList.Content = simManager.InputEvents.ToCommandsText();
         // only save if the time we found is the best time ever, currently also saves when an equal time was found and accepted
         if (PreciseTime::bestPreciseTime == PreciseTime::bestPreciseTimeEver) {
-			m_commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + ", iterations: " + m_iterations + "\n";
+			m_commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + "\n";
 			m_commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
 			m_commandList.Save(m_resultFileName);
 		}
-    }
-
-    // informational functions
-    void PrintBruteforceInfo() {
-        if (!m_useInfoLogging && !m_useIterLogging) {
-            return;
-        }
-        
-        string message = "[AS] ";
-
-        if (m_useInfoLogging) {
-            message += "best precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16);
-        }
-
-        if (m_useIterLogging) {
-            if (m_useInfoLogging) {
-                message += " | ";
-            }
-            message += "iterations: " + Text::FormatInt(m_iterations) + " | iters/sec: " + DecimalFormatted(m_iterationsPerSecond, 2);
-        }
-
-        print(message);
-    }
-
-    void UpdateIterationsPerSecond() {
-        m_iterations++;
-        m_iterationsCounter++;
-
-        if (m_iterationsCounter % m_loggingInterval == 0) {
-            PrintBruteforceInfo();
-
-            float currentTime = float(Time::Now);
-            currentTime /= 1000.0f;
-            float timeSinceLastUpdate = currentTime - m_lastIterationsPerSecondUpdate;
-            m_iterationsPerSecond = float(m_iterationsCounter) / timeSinceLastUpdate;
-            m_lastIterationsPerSecondUpdate = currentTime;
-            m_iterationsCounter = 0;
-        }
     }
 
     SimulationManager@ m_simManager;
@@ -523,41 +459,13 @@ void BruteforceSettingsWindow() {
         UI::Text("Result file name " + m_resultFileName);
     }
     UI::PopItemWidth();
-
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-    
-    UI::PopItemWidth();
-
-    // kim_bf_use_info_logging
-    m_useInfoLogging = UI::CheckboxVar("Log Info", "kim_bf_use_info_logging");
-    UI::TextDimmed("Log information about the current run to the console.");
-
-    // kim_bf_use_iter_logging
-    m_useIterLogging = UI::CheckboxVar("Log Iterations", "kim_bf_use_iter_logging");
-    UI::TextDimmed("Log information about each iteration to the console.");
-
-    // kim_bf_logging_interval
-    UI::PushItemWidth(180);
-    m_loggingInterval = uint(Math::Clamp(UI::SliderIntVar("Logging Interval", "kim_bf_logging_interval", 1, 1000), 1, 1000));
-    SetVariable("kim_bf_logging_interval", m_loggingInterval);
-    UI::TextDimmed("Log to console every x iterations.");
-    UI::PopItemWidth();
 }
 
 
 void Main() {
     @m_Manager = Manager();
-
     RegisterVariable("kim_bf_result_file_name", "result.txt");
-
-    RegisterVariable("kim_bf_use_info_logging", true);
-    RegisterVariable("kim_bf_use_iter_logging", true);
-    RegisterVariable("kim_bf_logging_interval", 200.0);
-
     UpdateSettings();
-
     RegisterValidationHandler("kim_bf_controller", "[AS] Kim's Bruteforce Controller", BruteforceSettingsWindow);
 }
 
