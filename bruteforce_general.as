@@ -6,8 +6,6 @@ int m_bestTime; // best time the bf found so far, precise or not
 // helper vars
 bool m_wasBaseRunFound = false;
 int m_bestTimeEver; // keeps track for the best time ever reached, useful for bf that allows for worse times to be found
-bool m_canAcceptWorseTimes = false; // will become true if settings are set that allow for worse times to be found
-
 
 // settings vars
 string m_resultFileName;
@@ -141,14 +139,6 @@ namespace PreciseTime {
             return;
         }
 
-        // handle worse result acceptance probability
-        if (m_canAcceptWorseTimes && foundPreciseTime > previousBestPreciseTime) {
-            if (Math::Rand(0.0f, 1.0f) > 1) {
-                response.Decision = BFEvaluationDecision::Reject;
-                return;
-            }
-        }
-
         // anything below this point means we will accept the new time
 
         if (!m_wasBaseRunFound) {
@@ -198,12 +188,7 @@ void UpdateSettings() {
     m_useInfoLogging = GetVariableBool("kim_bf_use_info_logging");
     m_useIterLogging = GetVariableBool("kim_bf_use_iter_logging");
     m_loggingInterval = Math::Clamp(uint(GetVariableDouble("kim_bf_logging_interval")), 1, 1000);
-
-    // specify any conditions that could lead to a worse time here
-    m_canAcceptWorseTimes = false;
 }
-
-/* SIMULATION MANAGEMENT */
 
 class BruteforceController {
     BruteforceController() {}
@@ -506,7 +491,6 @@ class Manager {
     BruteforceController@ m_bfController;
 }
 
-/* these functions are called from the game, we relay them to our manager */
 void OnSimulationBegin(SimulationManager@ simManager) {
     m_Manager.OnSimulationBegin(simManager);
 }
@@ -532,7 +516,6 @@ void BruteforceSettingsWindow() {
     UI::Separator();
     UI::Dummy(vec2(0, 15));
 
-    // m_resultFileName
     UI::PushItemWidth(120);
     if (!m_Manager.m_bfController.active) {
         m_resultFileName = UI::InputTextVar("Result file name", "kim_bf_result_file_name");
@@ -561,10 +544,6 @@ void BruteforceSettingsWindow() {
     SetVariable("kim_bf_logging_interval", m_loggingInterval);
     UI::TextDimmed("Log to console every x iterations.");
     UI::PopItemWidth();
-
-
-    // specify any conditions that could lead to a worse time here
-    m_canAcceptWorseTimes = false;
 }
 
 
