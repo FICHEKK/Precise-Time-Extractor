@@ -11,7 +11,6 @@ int m_bestTime; // best time the bf found so far, precise or not
 bool m_wasBaseRunFound = false;
 int m_bestTimeEver; // keeps track for the best time ever reached, useful for bf that allows for worse times to be found
 bool m_canAcceptWorseTimes = false; // will become true if settings are set that allow for worse times to be found
-bool m_customStopTimeDeltaIsIgnored = false; // used for m_customStopTimeDeltaUseOnlyOnce, will become true after the first time the custom stop time delta was used
 
 
 // settings vars
@@ -54,11 +53,6 @@ uint m_modifySteeringMaxDiff;
 bool m_useFillMissingInputsSteering;
 bool m_useFillMissingInputsAcceleration;
 bool m_useFillMissingInputsBrake;
-
-// specifies whether the stop time delta should only apply once for bruteforce and from that point on the stop time delta is ignored or if it should always use the stop time delta
-bool m_customStopTimeDeltaUseOnlyOnce;
-// todo: make the typing of this var less not good
-double m_customStopTimeDelta;
 
 // this will only be used for cases where worse times can be driven, meaning m_canAcceptWorseTimes has to be true, otherwise it has no effect
 float m_worseResultAcceptanceProbability;
@@ -114,9 +108,6 @@ namespace NormalTime {
         // we cannot wait for an infinite amount of time, and has nothing to do with the fact whether or not we end up with better/worse time
         // or if we want to accept or not accept better/worse times.
         int maxTimeLimit = m_bestTime;
-        if (!m_customStopTimeDeltaIsIgnored) {
-            maxTimeLimit += int(m_customStopTimeDelta);
-        }
 
         if (targetReached) {
             if (!m_wasBaseRunFound) {
@@ -129,12 +120,6 @@ namespace NormalTime {
                     m_bestTimeEver = m_bestTime;
                     m_Manager.m_bfController.SaveSolutionToFile();
                 }
-            }
-
-            if (m_customStopTimeDeltaUseOnlyOnce && !m_customStopTimeDeltaIsIgnored) {
-                m_customStopTimeDeltaIsIgnored = true;
-                // TODO: the variable below needs to be updated in more automatic ways
-                m_canAcceptWorseTimes = m_canAcceptWorseTimes && (m_customStopTimeDelta <= 0.0);
             }
 
             response.Decision = BFEvaluationDecision::Accept;
@@ -181,9 +166,6 @@ namespace NormalTime {
 
         // see previous usages of this variable for more info
         int maxTimeLimit = m_bestTime;
-        if (!m_customStopTimeDeltaIsIgnored) {
-            maxTimeLimit += int(m_customStopTimeDelta);
-        }
 
         if (targetReached) {
             if (tickTime > maxTimeLimit) {
@@ -203,12 +185,6 @@ namespace NormalTime {
             }
 
             // anything below this point means we will accept the new time
-            
-            if (m_customStopTimeDeltaUseOnlyOnce && !m_customStopTimeDeltaIsIgnored) {
-                m_customStopTimeDeltaIsIgnored = true;
-                // TODO: this variable below needs to be updated in more automatic ways
-                m_canAcceptWorseTimes = m_canAcceptWorseTimes && (m_customStopTimeDelta <= 0.0);
-            }
             
             if (!m_wasBaseRunFound) {
                 print("[Search phase] Found new base run with time: " +  newTime + " sec", Severity::Success);
@@ -235,7 +211,7 @@ namespace NormalTime {
                 m_Manager.m_bfController.SaveSolutionToFile();
             }
 
-            m_Manager.m_simManager.SetSimulationTimeLimit(int(m_customStopTimeDelta) + newTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
+            m_Manager.m_simManager.SetSimulationTimeLimit(newTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
 
             response.Decision = BFEvaluationDecision::Accept;
             return;
@@ -277,9 +253,6 @@ namespace PreciseTime {
         }
 
         int maxTimeLimit = m_bestTime;
-        if (!m_customStopTimeDeltaIsIgnored) {
-            maxTimeLimit += int(m_customStopTimeDelta);
-        }
 
         if (targetReached) {
             if (!m_wasBaseRunFound) {
@@ -293,12 +266,6 @@ namespace PreciseTime {
                     m_bestTimeEver = m_bestTime;
                     m_Manager.m_bfController.SaveSolutionToFile();
                 }
-            }
-
-            if (m_customStopTimeDeltaUseOnlyOnce && !m_customStopTimeDeltaIsIgnored) {
-                m_customStopTimeDeltaIsIgnored = true;
-                // TODO: the variable below needs to be updated in more automatic ways
-                m_canAcceptWorseTimes = m_canAcceptWorseTimes && (m_customStopTimeDelta <= 0.0);
             }
 
             response.Decision = BFEvaluationDecision::Accept;
@@ -345,9 +312,6 @@ namespace PreciseTime {
 
         // see previous usages of this variable for more info
         int maxTimeLimit = m_bestTime;
-        if (!m_customStopTimeDeltaIsIgnored) {
-            maxTimeLimit += int(m_customStopTimeDelta);
-        }
 
         if (!PreciseTime::isEstimating) {
             if (!targetReached) {
@@ -396,9 +360,6 @@ namespace PreciseTime {
 
         // see previous usages of this variable for more info (maxTimeLimit)
         double maxPreciseTimeLimit = previousBestPreciseTime;
-        if (!m_customStopTimeDeltaIsIgnored) {
-            maxPreciseTimeLimit += (m_customStopTimeDelta / 1000.0);
-        }
 
         if (foundPreciseTime >= maxPreciseTimeLimit) {
             response.Decision = BFEvaluationDecision::Reject;
@@ -414,12 +375,6 @@ namespace PreciseTime {
         }
 
         // anything below this point means we will accept the new time
-
-        if (m_customStopTimeDeltaUseOnlyOnce && !m_customStopTimeDeltaIsIgnored) {
-            m_customStopTimeDeltaIsIgnored = true;
-            // TODO: this variable below needs to be updated in more automatic ways
-            m_canAcceptWorseTimes = m_canAcceptWorseTimes && (m_customStopTimeDelta <= 0.0);
-        }
 
         if (!m_wasBaseRunFound) {
             print("[Search phase] Found new base run with precise time: " +  DecimalFormatted(foundPreciseTime, 16) + " sec", Severity::Success);
@@ -450,7 +405,7 @@ namespace PreciseTime {
             m_bestTimeEver = m_bestTime;
         }
 
-        m_Manager.m_simManager.SetSimulationTimeLimit(int(m_customStopTimeDelta) + m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
+        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
 
         response.Decision = BFEvaluationDecision::Accept;
     }
@@ -588,24 +543,8 @@ void UpdateSettings() {
     SetVariable("kim_bf_modify_steering_min_diff", m_modifySteeringMinDiff);
     SetVariable("kim_bf_modify_steering_max_diff", m_modifySteeringMaxDiff);
 
-    // TODO: implement
-    // modify only existing inputs
-    // m_modifyOnlyExistingInputs = GetVariableBool("kim_bf_modify_only_existing_inputs");
-
-    // use custom stop time delta only once
-    bool previousCustomStopTimeDeltaUseOnlyOnce = m_customStopTimeDeltaUseOnlyOnce;
-    m_customStopTimeDeltaUseOnlyOnce = GetVariableBool("kim_bf_custom_stop_time_delta_use_only_once");
-    // custom stop time delta
-    m_customStopTimeDelta = GetVariableDouble("kim_bf_custom_stop_time_delta");
-	m_customStopTimeDelta = double(m_customStopTimeDelta * 1000.0);
-
-    // check if the m_customStopTimeDeltaUseOnlyOnce value has changed
-    if (previousCustomStopTimeDeltaUseOnlyOnce != m_customStopTimeDeltaUseOnlyOnce) {
-        m_customStopTimeDeltaIsIgnored = false;
-    }
-
     if (@simManager != null && m_Manager.m_bfController.active) {
-        m_Manager.m_simManager.SetSimulationTimeLimit(int(m_customStopTimeDelta) + m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
+        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
     }
 
     // accept worse times chance
@@ -620,7 +559,7 @@ void UpdateSettings() {
     /* helper vars */
 
     // specify any conditions that could lead to a worse time here
-    m_canAcceptWorseTimes = m_customStopTimeDelta > 0.0;
+    m_canAcceptWorseTimes = false;
 }
 
 /* SIMULATION MANAGEMENT */
@@ -711,10 +650,6 @@ class BruteforceController {
         m_useFillMissingInputsSteering = GetVariableBool("kim_bf_use_fill_missing_inputs_steering");
         m_useFillMissingInputsAcceleration = GetVariableBool("kim_bf_use_fill_missing_inputs_acceleration");
         m_useFillMissingInputsBrake = GetVariableBool("kim_bf_use_fill_missing_inputs_brake");
-
-
-        // for m_customStopTimeDelta / m_customStopTimeDeltaUseOnlyOnce
-        m_customStopTimeDeltaIsIgnored = false;
     }
     
     void StartInitialPhase() {
@@ -912,18 +847,6 @@ class BruteforceController {
     void RandomNeighbour() {
         TM::InputEventBuffer@ inputBuffer = m_simManager.InputEvents;
 
-        /*        
-        // remove unnecessary events from inputBuffer (TODO: keep, remove? it doesnt ask for m_customStopTimeDelta either right now, but it does seem to work)
-        if (int(inputBuffer[inputBuffer.Length - 1].Time - 100010) > m_bestTime) {
-            uint removeIndex = inputBuffer.Length - 1;
-            while (int(inputBuffer[removeIndex].Time - 100010) > m_bestTime) {
-                removeIndex -= 1;
-            }
-            inputBuffer.RemoveAt(removeIndex + 1, inputBuffer.Length - removeIndex);
-        }
-        */
-
-
         m_rewindIndex = 2147483647;
         uint lowestTimeModified = 2147483647;
 
@@ -934,15 +857,15 @@ class BruteforceController {
         }
 
         uint modifySteeringMinTime = Math::Max(0, m_modifySteeringMinTime);
-        uint modifySteeringMaxTime = m_bestTime + int(m_customStopTimeDelta);
+        uint modifySteeringMaxTime = m_bestTime;
         modifySteeringMaxTime = m_modifySteeringMaxTime == 0 ? modifySteeringMaxTime : Math::Min(modifySteeringMaxTime, m_modifySteeringMaxTime);
 
         uint modifyAccelerationMinTime = Math::Max(0, m_modifyAccelerationMinTime);
-        uint modifyAccelerationMaxTime = m_bestTime + int(m_customStopTimeDelta);
+        uint modifyAccelerationMaxTime = m_bestTime;
         modifyAccelerationMaxTime = m_modifyAccelerationMaxTime == 0 ? modifyAccelerationMaxTime : Math::Min(modifyAccelerationMaxTime, m_modifyAccelerationMaxTime);
 
         uint modifyBrakeMinTime = Math::Max(0, m_modifyBrakeMinTime);
-        uint modifyBrakeMaxTime = m_bestTime + int(m_customStopTimeDelta);
+        uint modifyBrakeMaxTime = m_bestTime;
         modifyBrakeMaxTime = m_modifyBrakeMaxTime == 0 ? modifyBrakeMaxTime : Math::Min(modifyBrakeMaxTime, m_modifyBrakeMaxTime);
 
         // input modifications based on m_modifyType
@@ -1952,47 +1875,6 @@ void BruteforceSettingsWindow() {
     UI::Separator();
     UI::Dummy(vec2(0, 15));
 
-    /* custom stop time */
-    UI::PushItemWidth(180);
-    // m_customStopTimeDeltaUseOnlyOnce
-    if (true || !m_Manager.m_bfController.active) {
-        bool previousCustomStopTimeDeltaUseOnlyOnce = m_customStopTimeDeltaUseOnlyOnce;
-        m_customStopTimeDeltaUseOnlyOnce = UI::CheckboxVar("Use Custom Stop Time Delta Only Once", "kim_bf_custom_stop_time_delta_use_only_once");
-        // helper var for m_customStopTimeDeltaUseOnlyOnce
-        if (previousCustomStopTimeDeltaUseOnlyOnce != m_customStopTimeDeltaUseOnlyOnce) {
-            // in either case we simply reset the m_customStopTimeDeltaIsIgnored value
-            m_customStopTimeDeltaIsIgnored = false;
-        }
-    } else {
-        // grey out by simulating with ✓ text
-        if (m_customStopTimeDeltaUseOnlyOnce) {
-            UI::Text("[✓] Use Custom Stop Time Delta Only Once");
-        } else {
-            UI::Text("[] Use Custom Stop Time Delta Only Once");
-        }
-    }
-    // m_customStopTimeDelta, i use InputFloatVar because InputTimeVar doesn't allow for negative values
-    auto previousCustomStopTimeDelta = m_customStopTimeDelta;
-    m_customStopTimeDelta = UI::InputFloatVar("##overridestoptime", "kim_bf_custom_stop_time_delta", 0.01f);
-    
-    
-    UI::SameLine();
-	UI::Text("Custom stop time delta ( " + DecimalFormatted(m_customStopTimeDelta, 7) + " sec)");
-	m_customStopTimeDelta = double(m_customStopTimeDelta * 1000.0);
-
-    if (previousCustomStopTimeDelta != m_customStopTimeDelta) {
-        if (@m_Manager.m_simManager != null && m_Manager.m_bfController.active) {
-            m_Manager.m_simManager.SetSimulationTimeLimit(int(m_customStopTimeDelta) + m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
-        }
-    }
-
-    UI::TextDimmed("Allow the car to drive until +/- the current best time of the bruteforce. Example: Set it to -0.05 and it will only find improvements that are atleast 0.05 sec better than the current best time. Set it to +0.05 to accept times that are up to 0.05 sec worse, for example if you force finished and need to reach the finish again. \nExtra note: This input field only allows 3 decimals, but you can still write down more precision, the value next to it shows the actual value that will be used.");
-    UI::PopItemWidth();
-    
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
     // kim_bf_worse_result_acceptance_probability
     UI::PushItemWidth(180);
     m_worseResultAcceptanceProbability = Math::Clamp(UI::SliderFloatVar("Worse Result Acceptance Probability", "kim_bf_worse_result_acceptance_probability", 0.00000001f, 1.0f, "%.8f"), 0.00000001f, 1.0f);
@@ -2021,7 +1903,7 @@ void BruteforceSettingsWindow() {
 
 
     // specify any conditions that could lead to a worse time here
-    m_canAcceptWorseTimes = m_customStopTimeDelta > 0.0;
+    m_canAcceptWorseTimes = false;
 }
 
 
@@ -2067,9 +1949,6 @@ void Main() {
     RegisterVariable("kim_bf_use_fill_missing_inputs_steering", false);
     RegisterVariable("kim_bf_use_fill_missing_inputs_acceleration", false);
     RegisterVariable("kim_bf_use_fill_missing_inputs_brake", false);
-
-    RegisterVariable("kim_bf_custom_stop_time_delta_use_only_once", false);
-    RegisterVariable("kim_bf_custom_stop_time_delta", 0.0);
 
     RegisterVariable("kim_bf_use_info_logging", true);
     RegisterVariable("kim_bf_use_iter_logging", true);
