@@ -47,9 +47,6 @@ bool m_useFillMissingInputsSteering;
 bool m_useFillMissingInputsAcceleration;
 bool m_useFillMissingInputsBrake;
 
-// this will only be used for cases where worse times can be driven, meaning m_canAcceptWorseTimes has to be true, otherwise it has no effect
-float m_worseResultAcceptanceProbability;
-
 bool m_useInfoLogging;
 bool m_useIterLogging;
 uint m_loggingInterval;
@@ -220,7 +217,7 @@ namespace PreciseTime {
 
         // handle worse result acceptance probability
         if (m_canAcceptWorseTimes && foundPreciseTime > previousBestPreciseTime) {
-            if (Math::Rand(0.0f, 1.0f) > m_worseResultAcceptanceProbability) {
+            if (Math::Rand(0.0f, 1.0f) > 1) {
                 response.Decision = BFEvaluationDecision::Reject;
                 return;
             }
@@ -379,9 +376,6 @@ void UpdateSettings() {
     if (@simManager != null && m_Manager.m_bfController.active) {
         m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
     }
-
-    // accept worse times chance
-    m_worseResultAcceptanceProbability = Math::Clamp(float(GetVariableDouble("kim_bf_worse_result_acceptance_probability")), 0.00000001f, 1.0f);
 
     // logging
     m_useInfoLogging = GetVariableBool("kim_bf_use_info_logging");
@@ -1636,17 +1630,6 @@ void BruteforceSettingsWindow() {
     UI::Separator();
     UI::Dummy(vec2(0, 15));
 
-    // kim_bf_worse_result_acceptance_probability
-    UI::PushItemWidth(180);
-    m_worseResultAcceptanceProbability = Math::Clamp(UI::SliderFloatVar("Worse Result Acceptance Probability", "kim_bf_worse_result_acceptance_probability", 0.00000001f, 1.0f, "%.8f"), 0.00000001f, 1.0f);
-    SetVariable("kim_bf_worse_result_acceptance_probability", m_worseResultAcceptanceProbability);
-    UI::TextDimmed("This will only be used for scenarios where a worse time can be driven and also get accepted, for example if the custom override delta time is positive");
-    UI::PopItemWidth();
-    
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
     // kim_bf_use_info_logging
     m_useInfoLogging = UI::CheckboxVar("Log Info", "kim_bf_use_info_logging");
     UI::TextDimmed("Log information about the current run to the console.");
@@ -1707,8 +1690,6 @@ void Main() {
     RegisterVariable("kim_bf_use_info_logging", true);
     RegisterVariable("kim_bf_use_iter_logging", true);
     RegisterVariable("kim_bf_logging_interval", 200.0);
-
-    RegisterVariable("kim_bf_worse_result_acceptance_probability", 1.0f);
 
     UpdateSettings();
 
