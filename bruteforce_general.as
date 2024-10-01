@@ -18,7 +18,6 @@ bool m_customStopTimeDeltaIsIgnored = false; // used for m_customStopTimeDeltaUs
 string m_resultFileName;
 
 bool m_usePreciseTime;
-uint64 m_preciseTimePrecision;
 
 uint m_modifySteeringMinTime;
 uint m_modifyAccelerationMinTime;
@@ -378,7 +377,7 @@ namespace PreciseTime {
         uint64 currentCoeff = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
         double currentCoeffPercentage = currentCoeff / 18446744073709551615.0;
 
-        if (PreciseTime::coeffMax - PreciseTime::coeffMin > m_preciseTimePrecision) {
+        if (PreciseTime::coeffMax - PreciseTime::coeffMin > 1) {
             vec3 LinearSpeed = simManager.Dyna.CurrentState.LinearSpeed;
             vec3 AngularSpeed = simManager.Dyna.CurrentState.AngularSpeed;
             LinearSpeed *= currentCoeffPercentage;
@@ -506,11 +505,6 @@ void UpdateSettings() {
 
     // precise time
     m_usePreciseTime = GetVariableBool("kim_bf_use_precise_time");
-	if (m_usePreciseTime) {
-		// precise time precision
-		m_preciseTimePrecision = uint(Math::Max(1, int(GetVariableDouble("kim_bf_precise_time_precision"))));
-        SetVariable("kim_bf_precise_time_precision", m_preciseTimePrecision);
-	}
 
     // modify type
     m_modifyType = GetVariableString("kim_bf_modify_type");
@@ -1688,21 +1682,6 @@ void BruteforceSettingsWindow() {
     m_usePreciseTime = UI::CheckboxVar("##precisetimeenabled", "kim_bf_use_precise_time");
     UI::SameLine();
     UI::Text("Use precise time");
-
-    if (m_usePreciseTime) {
-        // precise time precision
-        UI::SameLine();
-        // TODO: inputintvar is not enough to accept 64 bit values
-        int preciseTimePrecision = UI::InputIntVar("##precisetimeprecision", "kim_bf_precise_time_precision", 1);
-        if (preciseTimePrecision < 1) {
-            preciseTimePrecision = 1;
-            SetVariable("kim_bf_precise_time_precision", 1);
-        }
-        m_preciseTimePrecision = preciseTimePrecision;
-        UI::SameLine();
-        UI::Text("Precision");
-        UI::TextDimmed("1 = max precision. higher values = less precision. theoretical maximum is 2^64-1, however this field is limited to 32 bit values. Also 1 might be completely overkill and higher values could lead to the same result.");
-    }
     
     UI::PopItemWidth();
 
@@ -2106,7 +2085,6 @@ void Main() {
     RegisterVariable("kim_bf_target_id", 1.0); // id of target (index + 1), used for checkpoint/trigger
 
     RegisterVariable("kim_bf_use_precise_time", true);
-    RegisterVariable("kim_bf_precise_time_precision", 1.0);
 
     RegisterVariable("kim_bf_modify_steering_min_time", 0.0);
     RegisterVariable("kim_bf_modify_acceleration_min_time", 0.0);
@@ -2138,9 +2116,6 @@ void Main() {
 
     RegisterVariable("kim_bf_modify_steering_min_diff", 1.0);
     RegisterVariable("kim_bf_modify_steering_max_diff", 131072.0);
-
-    // TODO: implement
-    // RegisterVariable("kim_bf_modify_only_existing_inputs", false);
 
     RegisterVariable("kim_bf_use_fill_missing_inputs_steering", false);
     RegisterVariable("kim_bf_use_fill_missing_inputs_acceleration", false);
