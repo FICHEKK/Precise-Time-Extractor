@@ -1,13 +1,8 @@
 Manager @m_Manager;
 
-// bruteforce vars
 int m_bestTime; // best time the bf found so far, precise or not
-
-// helper vars
 bool m_wasBaseRunFound = false;
 int m_bestTimeEver; // keeps track for the best time ever reached, useful for bf that allows for worse times to be found
-
-// settings vars
 string m_resultFileName;
 
 string DecimalFormatted(float number, int precision = 10) {
@@ -179,22 +174,17 @@ class BruteforceController {
     BruteforceController() {}
     ~BruteforceController() {}
 
-    // reset variables bruteforce needs
     void SetBruteforceVariables(SimulationManager@ simManager) {
-        // General Variables
         m_wasBaseRunFound = false;
         m_bestTime = simManager.EventsDuration; // original time of the replay
         m_bestTimeEver = m_bestTime;
 
-        // PreciseTime Variables
         PreciseTime::isEstimating = false;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
         PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0; // best precise time the bf found so far
-        // PreciseTime helper variables
         PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
 
-        // Bruteforce Variables
         m_resultFileName = GetVariableString("kim_bf_result_file_name");
     }
     
@@ -212,7 +202,6 @@ class BruteforceController {
     }
 
     void StartNewIteration() {
-        // randomize the inputbuffers values
         RandomNeighbour();
         m_simManager.RewindToState(m_originalSimulationStates[m_rewindIndex]);
     }
@@ -471,9 +460,9 @@ void Main() {
 
 PluginInfo@ GetPluginInfo() {
     auto info = PluginInfo();
-    info.Name = "Kim's Bruteforce Controller";
-    info.Author = "Kim";
-    info.Version = "v1.3.4";
-    info.Description = "General bruteforcing capabilities";
+    info.Name = "fic's Precise Time Extractor";
+    info.Author = "fic";
+    info.Version = "v1.0.0";
+    info.Description = "Plugin that allows you to automatically extract precise times of multiple replay input files.";
     return info;
 }
