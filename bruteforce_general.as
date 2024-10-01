@@ -1,8 +1,8 @@
 Manager @m_Manager;
 
-int m_bestTime; // best time the bf found so far, precise or not
 bool m_wasBaseRunFound = false;
-int m_bestTimeEver; // keeps track for the best time ever reached, useful for bf that allows for worse times to be found
+int m_bestTime;
+int m_bestTimeEver;
 string m_resultFileName;
 
 string DecimalFormatted(float number, int precision = 10) {
@@ -23,7 +23,6 @@ namespace PreciseTime {
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
         int tickTime = simManager.TickTime;
-
         bool targetReached = simManager.PlayerInfo.RaceFinished;
         int maxTimeLimit = m_bestTime;
 
@@ -34,7 +33,6 @@ namespace PreciseTime {
                 m_bestTime = tickTime - 10;
                 PreciseTime::bestPreciseTime = (m_bestTime / 1000.0) + 0.01;
                 
-                // check if best time ever was driven
                 if (m_bestTime < m_bestTimeEver) {
                     m_bestTimeEver = m_bestTime;
                     m_Manager.m_bfController.SaveSolutionToFile();
@@ -65,10 +63,7 @@ namespace PreciseTime {
 
     void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
         int tickTime = simManager.TickTime;
-
         bool targetReached = simManager.PlayerInfo.RaceFinished;
-
-        // see previous usages of this variable for more info
         int maxTimeLimit = m_bestTime;
 
         if (!PreciseTime::isEstimating) {
@@ -108,15 +103,12 @@ namespace PreciseTime {
             return;
         }
 
-        // finished estimating precise time
         PreciseTime::isEstimating = false;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
 
         double foundPreciseTime = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
         double previousBestPreciseTime = PreciseTime::bestPreciseTime;
-
-        // see previous usages of this variable for more info (maxTimeLimit)
         double maxPreciseTimeLimit = previousBestPreciseTime;
 
         if (foundPreciseTime >= maxPreciseTimeLimit) {
@@ -124,49 +116,35 @@ namespace PreciseTime {
             return;
         }
 
-        // anything below this point means we will accept the new time
-
         if (!m_wasBaseRunFound) {
             print("[Search phase] Found new base run with precise time: " +  DecimalFormatted(foundPreciseTime, 16) + " sec", Severity::Success);
             m_wasBaseRunFound = true;
         } else {
-            string message = "[AS] Found";
-            // higher or equal can only occur if settings are set up in such a way that worse (or equal) times are allowed to be found
-            if (foundPreciseTime < previousBestPreciseTime) {
-                message += " lower ";
-            } else if (foundPreciseTime == previousBestPreciseTime) {
-                message += " equal ";
-            } else {
-                message += " higher ";
-            }
-            message += "precise time: " + DecimalFormatted(foundPreciseTime, 16);
-            print(message, Severity::Success);
+            print("[AS] Found precise time: " + DecimalFormatted(foundPreciseTime, 16), Severity::Success);
         }
 
         PreciseTime::bestPreciseTime = foundPreciseTime;
         m_bestTime = int(Math::Floor(PreciseTime::bestPreciseTime * 100.0)) * 10;
-            
-        // check if best time ever was driven
+        
         if (PreciseTime::bestPreciseTime < PreciseTime::bestPreciseTimeEver) {
             PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
             m_Manager.m_bfController.SaveSolutionToFile();
         }
+		
         if (m_bestTime < m_bestTimeEver) {
             m_bestTimeEver = m_bestTime;
         }
 
-        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
-
+        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
         response.Decision = BFEvaluationDecision::Accept;
     }
 }
 
-// general settings that can be updated during our outside of bruteforce and can be called at any point in time
 void UpdateSettings() {
     SimulationManager@ simManager = m_Manager.m_simManager;
 
     if (@simManager != null && m_Manager.m_bfController.active) {
-        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
+        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
     }
 }
 
@@ -176,13 +154,13 @@ class BruteforceController {
 
     void SetBruteforceVariables(SimulationManager@ simManager) {
         m_wasBaseRunFound = false;
-        m_bestTime = simManager.EventsDuration; // original time of the replay
+        m_bestTime = simManager.EventsDuration;
         m_bestTimeEver = m_bestTime;
 
         PreciseTime::isEstimating = false;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
-        PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0; // best precise time the bf found so far
+        PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
         PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
 
         m_resultFileName = GetVariableString("kim_bf_result_file_name");
@@ -441,7 +419,7 @@ void BruteforceSettingsWindow() {
     UI::Separator();
     UI::Dummy(vec2(0, 15));
 
-    UI::PushItemWidth(120);
+    UI::PushItemWidth(150);
     if (!m_Manager.m_bfController.active) {
         m_resultFileName = UI::InputTextVar("Result file name", "kim_bf_result_file_name");
     } else {
@@ -455,7 +433,7 @@ void Main() {
     @m_Manager = Manager();
     RegisterVariable("kim_bf_result_file_name", "result.txt");
     UpdateSettings();
-    RegisterValidationHandler("kim_bf_controller", "[AS] Kim's Bruteforce Controller", BruteforceSettingsWindow);
+    RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", BruteforceSettingsWindow);
 }
 
 PluginInfo@ GetPluginInfo() {
