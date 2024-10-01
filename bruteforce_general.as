@@ -30,13 +30,6 @@ double m_modifySteeringMaxPercentage;
 double m_modifyAccelerationMaxPercentage;
 double m_modifyBrakeMaxPercentage;
 
-uint m_modifySteeringMinHoldTime;
-uint m_modifyAccelerationMinHoldTime;
-uint m_modifyBrakeMinHoldTime;
-uint m_modifySteeringMaxHoldTime;
-uint m_modifyAccelerationMaxHoldTime;
-uint m_modifyBrakeMaxHoldTime;
-
 bool m_useInfoLogging;
 bool m_useIterLogging;
 uint m_loggingInterval;
@@ -336,26 +329,6 @@ void UpdateSettings() {
     SetVariable("kim_bf_modify_brake_min_percentage", m_modifyBrakeMinPercentage);
     SetVariable("kim_bf_modify_brake_max_percentage", m_modifyBrakeMaxPercentage);
 
-
-    // hold times
-    m_modifySteeringMinHoldTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_steering_min_hold_time"))));
-    m_modifySteeringMaxHoldTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_steering_max_hold_time"))));
-    m_modifySteeringMinHoldTime = Math::Min(m_modifySteeringMinHoldTime, m_modifySteeringMaxHoldTime);
-    SetVariable("kim_bf_modify_steering_min_hold_time", m_modifySteeringMinHoldTime);
-    SetVariable("kim_bf_modify_steering_max_hold_time", m_modifySteeringMaxHoldTime);
-
-    m_modifyAccelerationMinHoldTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_acceleration_min_hold_time"))));
-    m_modifyAccelerationMaxHoldTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_acceleration_max_hold_time"))));
-    m_modifyAccelerationMinHoldTime = Math::Min(m_modifyAccelerationMinHoldTime, m_modifyAccelerationMaxHoldTime);
-    SetVariable("kim_bf_modify_acceleration_min_hold_time", m_modifyAccelerationMinHoldTime);
-    SetVariable("kim_bf_modify_acceleration_max_hold_time", m_modifyAccelerationMaxHoldTime);
-
-    m_modifyBrakeMinHoldTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_brake_min_hold_time"))));
-    m_modifyBrakeMaxHoldTime = uint(Math::Max(0, int(GetVariableDouble("kim_bf_modify_brake_max_hold_time"))));
-    m_modifyBrakeMinHoldTime = Math::Min(m_modifyBrakeMinHoldTime, m_modifyBrakeMaxHoldTime);
-    SetVariable("kim_bf_modify_brake_min_hold_time", m_modifyBrakeMinHoldTime);
-    SetVariable("kim_bf_modify_brake_max_hold_time", m_modifyBrakeMaxHoldTime);
-
     if (@simManager != null && m_Manager.m_bfController.active) {
         m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010); // i add 10010 because tmi subtracts 10010 and it seems to be wrong. (also dont confuse this with the other value of 100010, thats something else)
     }
@@ -572,28 +545,13 @@ class BruteforceController {
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
                     steerValuesModified++;
 
-                    if (m_modifySteeringMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifySteeringMinHoldTime / 10, m_modifySteeringMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifySteeringMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Steer);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Steer, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Analog = newValue;
-                            }
-                            startTime += 10;
-                        }
-                    } else {
-                        // check if next neighbouring tick is not a steer event, and if so, add a new one with value 0
-                        if (modifyTime + 10 < modifySteeringMaxTime) {
-                            auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Steer);
-                            if (nextIndex.Length == 0) {
-                                inputBuffer.Add(modifyTime + 10, InputType::Steer, 0);
-                            }
-                        }
-                    }
+                    // check if next neighbouring tick is not a steer event, and if so, add a new one with value 0
+					if (modifyTime + 10 < modifySteeringMaxTime) {
+						auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Steer);
+						if (nextIndex.Length == 0) {
+							inputBuffer.Add(modifyTime + 10, InputType::Steer, 0);
+						}
+					}
                 } else {
                     // if there is a value at that time, modify it
                     int oldSteerValue = inputBuffer[modifyIndex[0]].Value.Analog;
@@ -602,21 +560,6 @@ class BruteforceController {
 
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
                     steerValuesModified++;
-                    
-                    if (m_modifySteeringMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifySteeringMinHoldTime / 10, m_modifySteeringMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifySteeringMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Steer);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Steer, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Analog = newValue;
-                            }
-                            startTime += 10;
-                        }
-                    }
                 }
             }
 
@@ -636,28 +579,13 @@ class BruteforceController {
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
                     accelerationValuesModified++;
 
-                    if (m_modifyAccelerationMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyAccelerationMinHoldTime / 10, m_modifyAccelerationMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyAccelerationMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Up);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Up, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    } else {
-                        // check if next neighbouring tick is not a acceleration event, and if so, add a new one with value 0
-                        if (modifyTime + 10 < modifyAccelerationMaxTime) {
-                            auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Up);
-                            if (nextIndex.Length == 0) {
-                                inputBuffer.Add(modifyTime + 10, InputType::Up, 0);
-                            }
-                        }
-                    }
+                    // check if next neighbouring tick is not a acceleration event, and if so, add a new one with value 0
+					if (modifyTime + 10 < modifyAccelerationMaxTime) {
+						auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Up);
+						if (nextIndex.Length == 0) {
+							inputBuffer.Add(modifyTime + 10, InputType::Up, 0);
+						}
+					}
                 } else {
                     // if there is a value at that time, modify it
                     int newValue = Math::Rand(0, 1);
@@ -665,21 +593,6 @@ class BruteforceController {
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
                     accelerationValuesModified++;
-                    
-                    if (m_modifyAccelerationMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyAccelerationMinHoldTime / 10, m_modifyAccelerationMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyAccelerationMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Up);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Up, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    }
                 }
             }
             
@@ -699,28 +612,13 @@ class BruteforceController {
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
                     brakeValuesModified++;
 
-                    if (m_modifyBrakeMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyBrakeMinHoldTime / 10, m_modifyBrakeMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyBrakeMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Down);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Down, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    } else {
-                        // check if next neighbouring tick is not a Brake event, and if so, add a new one with value 0
-                        if (modifyTime + 10 < modifyBrakeMaxTime) {
-                            auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Down);
-                            if (nextIndex.Length == 0) {
-                                inputBuffer.Add(modifyTime + 10, InputType::Down, 0);
-                            }
-                        }
-                    }
+                    // check if next neighbouring tick is not a Brake event, and if so, add a new one with value 0
+					if (modifyTime + 10 < modifyBrakeMaxTime) {
+						auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Down);
+						if (nextIndex.Length == 0) {
+							inputBuffer.Add(modifyTime + 10, InputType::Down, 0);
+						}
+					}
                 } else {
                     // if there is a value at that time, modify it
                     int newValue = Math::Rand(0, 1);
@@ -728,21 +626,6 @@ class BruteforceController {
 
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
                     brakeValuesModified++;
-                    
-                    if (m_modifyBrakeMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyBrakeMinHoldTime / 10, m_modifyBrakeMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyBrakeMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Down);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Down, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    }
                 }
             }
         } else if (m_modifyType == "percentage") {
@@ -774,28 +657,13 @@ class BruteforceController {
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
 
-                    if (m_modifySteeringMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifySteeringMinHoldTime / 10, m_modifySteeringMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifySteeringMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Steer);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Steer, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Analog = newValue;
-                            }
-                            startTime += 10;
-                        }
-                    } else {
-                        // check if next neighbouring tick is not a steer event, and if so, add a new one with value 0
-                        if (modifyTime + 10 < modifySteeringMaxTime) {
-                            auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Steer);
-                            if (nextIndex.Length == 0) {
-                                inputBuffer.Add(modifyTime + 10, InputType::Steer, 0);
-                            }
-                        }
-                    }
+                    // check if next neighbouring tick is not a steer event, and if so, add a new one with value 0
+					if (modifyTime + 10 < modifySteeringMaxTime) {
+						auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Steer);
+						if (nextIndex.Length == 0) {
+							inputBuffer.Add(modifyTime + 10, InputType::Steer, 0);
+						}
+					}
                 } else {
                     // if there is a value at that time, modify it
                     int oldSteerValue = inputBuffer[modifyIndex[0]].Value.Analog;
@@ -803,21 +671,6 @@ class BruteforceController {
                     inputBuffer[modifyIndex[0]].Value.Analog = newValue;
 
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
-                    
-                    if (m_modifySteeringMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifySteeringMinHoldTime / 10, m_modifySteeringMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifySteeringMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Steer);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Steer, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Analog = newValue;
-                            }
-                            startTime += 10;
-                        }
-                    }
                 }
             }
 
@@ -837,49 +690,19 @@ class BruteforceController {
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
 
-                    if (m_modifyAccelerationMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyAccelerationMinHoldTime / 10, m_modifyAccelerationMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyAccelerationMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Up);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Up, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    } else {
-                        // check if next neighbouring tick is not a acceleration event, and if so, add a new one with value 0
-                        if (modifyTime + 10 < modifyAccelerationMaxTime) {
-                            auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Up);
-                            if (nextIndex.Length == 0) {
-                                inputBuffer.Add(modifyTime + 10, InputType::Up, 0);
-                            }
-                        }
-                    }
+					// check if next neighbouring tick is not a acceleration event, and if so, add a new one with value 0
+					if (modifyTime + 10 < modifyAccelerationMaxTime) {
+						auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Up);
+						if (nextIndex.Length == 0) {
+							inputBuffer.Add(modifyTime + 10, InputType::Up, 0);
+						}
+					}
                 } else {
                     // if there is a value at that time, modify it
                     int newValue = Math::Rand(0, 1);
                     inputBuffer[modifyIndex[0]].Value.Binary = newValue == 1 ? true : false;
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
-                    
-                    if (m_modifyAccelerationMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyAccelerationMinHoldTime / 10, m_modifyAccelerationMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyAccelerationMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Up);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Up, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    }
                 }
             }
             
@@ -899,49 +722,19 @@ class BruteforceController {
                     
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
 
-                    if (m_modifyBrakeMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyBrakeMinHoldTime / 10, m_modifyBrakeMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyBrakeMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Down);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Down, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    } else {
-                        // check if next neighbouring tick is not a Brake event, and if so, add a new one with value 0
-                        if (modifyTime + 10 < modifyBrakeMaxTime) {
-                            auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Down);
-                            if (nextIndex.Length == 0) {
-                                inputBuffer.Add(modifyTime + 10, InputType::Down, 0);
-                            }
-                        }
-                    }
+                    // check if next neighbouring tick is not a Brake event, and if so, add a new one with value 0
+					if (modifyTime + 10 < modifyBrakeMaxTime) {
+						auto nextIndex = inputBuffer.Find(modifyTime + 10, InputType::Down);
+						if (nextIndex.Length == 0) {
+							inputBuffer.Add(modifyTime + 10, InputType::Down, 0);
+						}
+					}
                 } else {
                     // if there is a value at that time, modify it
                     int newValue = Math::Rand(0, 1);
                     inputBuffer[modifyIndex[0]].Value.Binary = newValue == 1 ? true : false;
 
                     lowestTimeModified = Math::Min(lowestTimeModified, modifyTime);
-                    
-                    if (m_modifyBrakeMaxHoldTime > 0) {
-                        uint holdTime = Math::Rand(m_modifyBrakeMinHoldTime / 10, m_modifyBrakeMaxHoldTime / 10) * 10;
-                        uint startTime = modifyTime + 10;
-                        uint endTime = Math::Min(startTime + holdTime, modifyBrakeMaxTime);
-                        while (startTime < endTime) {
-                            auto idx = inputBuffer.Find(startTime, InputType::Down);
-                            if (idx.Length == 0) {
-                                inputBuffer.Add(startTime, InputType::Down, newValue);
-                            } else {
-                                inputBuffer[idx[0]].Value.Binary = newValue == 1 ? true : false;
-                            }
-                            startTime += 10;
-                        }
-                    }
                 }
             }
         }
@@ -1365,61 +1158,6 @@ void BruteforceSettingsWindow() {
     }
     
     UI::PopItemWidth();
-
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
-    // m_modifySteeringMinHoldTime, m_modifySteeringMaxHoldTime,
-    // m_modifyAccelerationMinHoldTime, m_modifyAccelerationMaxHoldTime,
-    // m_modifyBrakeMinHoldTime, m_modifyBrakeMaxHoldTime
-    // TODO: in ui the +- buttons for the Max variants dont react when clicking once, but when holding, needs fixing
-    UI::PushItemWidth(180);
-    UI::Text("Input Modification Hold Time:");
-    int modifySteeringMinHoldTime = Math::Max(UI::InputTimeVar("Steer Min Hold", "kim_bf_modify_steering_min_hold_time", 10, 0), 0);
-    SetVariable("kim_bf_modify_steering_min_hold_time", modifySteeringMinHoldTime);
-    if (uint(modifySteeringMinHoldTime) > m_modifySteeringMaxHoldTime) {
-        SetVariable("kim_bf_modify_steering_max_hold_time", modifySteeringMinHoldTime);
-    }
-    UI::SameLine();
-    int modifySteeringMaxHoldTime = Math::Max(UI::InputTimeVar("Steer Max Hold", "kim_bf_modify_steering_max_hold_time", 10, 0), 0);
-    SetVariable("kim_bf_modify_steering_max_hold_time", modifySteeringMaxHoldTime);
-    if (uint(modifySteeringMaxHoldTime) < m_modifySteeringMinHoldTime) {
-        SetVariable("kim_bf_modify_steering_min_hold_time", modifySteeringMaxHoldTime);
-    }
-    m_modifySteeringMinHoldTime = modifySteeringMinHoldTime;
-    m_modifySteeringMaxHoldTime = modifySteeringMaxHoldTime;
-
-    int modifyAccelerationMinHoldTime = Math::Max(UI::InputTimeVar("Accel Min Hold", "kim_bf_modify_acceleration_min_hold_time", 10, 0), 0);
-    SetVariable("kim_bf_modify_acceleration_min_hold_time", modifyAccelerationMinHoldTime);
-    if (uint(modifyAccelerationMinHoldTime) > m_modifyAccelerationMaxHoldTime) {
-        SetVariable("kim_bf_modify_acceleration_max_hold_time", modifyAccelerationMinHoldTime);
-    }
-    UI::SameLine();
-    int modifyAccelerationMaxHoldTime = Math::Max(UI::InputTimeVar("Accel Max Hold", "kim_bf_modify_acceleration_max_hold_time", 10, 0), 0);
-    SetVariable("kim_bf_modify_acceleration_max_hold_time", modifyAccelerationMaxHoldTime);
-    if (uint(modifyAccelerationMaxHoldTime) < m_modifyAccelerationMinHoldTime) {
-        SetVariable("kim_bf_modify_acceleration_min_hold_time", modifyAccelerationMaxHoldTime);
-    }
-    m_modifyAccelerationMinHoldTime = modifyAccelerationMinHoldTime;
-    m_modifyAccelerationMaxHoldTime = modifyAccelerationMaxHoldTime;
-
-    int modifyBrakeMinHoldTime = Math::Max(UI::InputTimeVar("Brake Min Hold", "kim_bf_modify_brake_min_hold_time", 10, 0), 0);
-    SetVariable("kim_bf_modify_brake_min_hold_time", modifyBrakeMinHoldTime);
-    if (uint(modifyBrakeMinHoldTime) > m_modifyBrakeMaxHoldTime) {
-        SetVariable("kim_bf_modify_brake_max_hold_time", modifyBrakeMinHoldTime);
-    }
-    UI::SameLine();
-    int modifyBrakeMaxHoldTime = Math::Max(UI::InputTimeVar("Brake Max Hold", "kim_bf_modify_brake_max_hold_time", 10, 0), 0);
-    SetVariable("kim_bf_modify_brake_max_hold_time", modifyBrakeMaxHoldTime);
-    if (uint(modifyBrakeMaxHoldTime) < m_modifyBrakeMinHoldTime) {
-        SetVariable("kim_bf_modify_brake_min_hold_time", modifyBrakeMaxHoldTime);
-    }
-    m_modifyBrakeMinHoldTime = modifyBrakeMinHoldTime;
-    m_modifyBrakeMaxHoldTime = modifyBrakeMaxHoldTime;
-    UI::TextDimmed("Specifies how long the input will be held for. Note inputs will not be modified beyond the input max time. It also counts as 1 input modification even if multiple ticks are filled");
-
-    UI::PopItemWidth();
     
     UI::Dummy(vec2(0, 15));
     UI::Separator();
@@ -1469,13 +1207,6 @@ void Main() {
     RegisterVariable("kim_bf_modify_steering_max_percentage", 1.0);
     RegisterVariable("kim_bf_modify_acceleration_max_percentage", 0.0);
     RegisterVariable("kim_bf_modify_brake_max_percentage", 0.0);
-
-    RegisterVariable("kim_bf_modify_steering_min_hold_time", 0.0);
-    RegisterVariable("kim_bf_modify_acceleration_min_hold_time", 0.0);
-    RegisterVariable("kim_bf_modify_brake_min_hold_time", 0.0);
-    RegisterVariable("kim_bf_modify_steering_max_hold_time", 0.0);
-    RegisterVariable("kim_bf_modify_acceleration_max_hold_time", 0.0);
-    RegisterVariable("kim_bf_modify_brake_max_hold_time", 0.0);
 
     RegisterVariable("kim_bf_use_info_logging", true);
     RegisterVariable("kim_bf_use_iter_logging", true);
