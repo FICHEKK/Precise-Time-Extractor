@@ -4,8 +4,7 @@
 // 3. Enter name of the track should be extracted ("track").
 // 4. Enter from which index to which index to extract from (if min index = 1 and max index = 3, extract will be done for "track1.txt", "track2.txt" and "track3.txt").
 
-Manager @m_Manager;
-
+BruteforceController@ m_bfController;
 bool m_wasBaseRunFound = false;
 int m_bestTime;
 int m_bestTimeEver;
@@ -110,8 +109,8 @@ namespace PreciseTime {
 			}
         }
 
-		m_Manager.m_bfController.SaveSolutionToFile();
-        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
+		m_bfController.SaveSolutionToFile();
+        m_bfController.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
         response.Decision = BFEvaluationDecision::Accept;
     }
 }
@@ -205,61 +204,34 @@ class BruteforceController {
     void SaveSolutionToFile() {
 		CommandList commandList;
         commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + "\n";
-		commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
+		commandList.Content += m_bfController.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
 		commandList.Save(m_resultFileName);
     }
 }
 
-class Manager {
-    SimulationManager@ m_simManager;
-    BruteforceController@ m_bfController;
-	
-    Manager() {
-        @m_bfController = BruteforceController();
-    }
-    ~Manager() {}
-
-    void OnSimulationBegin(SimulationManager@ simManager) {
-        @m_simManager = simManager;
-        m_simManager.RemoveStateValidation();
-        m_bfController.OnSimulationBegin(simManager);
-    }
-
-    void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
-        if (userCancelled) {
-            m_bfController.OnSimulationEnd(simManager);
-            return;
-        }
-
-        m_bfController.OnSimulationStep(simManager);
-    }
-
-    void OnSimulationEnd(SimulationManager@ simManager, uint result) {
-        m_bfController.OnSimulationEnd(simManager);
-    }
-
-    void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
-        m_bfController.OnCheckpointCountChanged(simManager, count, target);
-    }
-}
-
 void OnSimulationBegin(SimulationManager@ simManager) {
-    m_Manager.OnSimulationBegin(simManager);
+	simManager.RemoveStateValidation();
+	m_bfController.OnSimulationBegin(simManager);
 }
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
-    m_Manager.OnSimulationStep(simManager, userCancelled);
+	if (userCancelled) {
+		m_bfController.OnSimulationEnd(simManager);
+		return;
+	}
+
+	m_bfController.OnSimulationStep(simManager);
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
-    m_Manager.OnCheckpointCountChanged(simManager, count, target);
+    m_bfController.OnCheckpointCountChanged(simManager, count, target);
 }
 
 void OnSimulationEnd(SimulationManager@ simManager, uint result) {
-    m_Manager.OnSimulationEnd(simManager, result);
+    m_bfController.OnSimulationEnd(simManager);
 }
 
-void BruteforceSettingsWindow() {
+void RenderSettings() {
     UI::Dummy(vec2(0, 15));
 
     UI::TextDimmed("Options:");
@@ -269,7 +241,7 @@ void BruteforceSettingsWindow() {
     UI::Dummy(vec2(0, 15));
 
     UI::PushItemWidth(150);
-    if (!m_Manager.m_bfController.active) {
+    if (!m_bfController.active) {
         m_resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
     } else {
         UI::Text("File name " + m_resultFileName);
@@ -279,9 +251,9 @@ void BruteforceSettingsWindow() {
 
 
 void Main() {
-    @m_Manager = Manager();
+    @m_bfController = BruteforceController();
     RegisterVariable("fic_pte_file_name", "track");
-    RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", BruteforceSettingsWindow);
+    RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", RenderSettings);
 }
 
 PluginInfo@ GetPluginInfo() {
