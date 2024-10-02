@@ -12,7 +12,7 @@ string m_resultFileName;
 int m_currentReplayIndex = 1;
 
 const int MIN_REPLAY_INDEX = 1;
-const int MAX_REPLAY_INDEX = 5;
+const int MAX_REPLAY_INDEX = 3;
 
 string DecimalFormatted(float number, int precision = 10) {
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
@@ -32,6 +32,7 @@ namespace PreciseTime {
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
 		if (!simManager.PlayerInfo.RaceFinished) {
+			@PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
 			response.Decision = BFEvaluationDecision::DoNothing;
 			return;
 		}
@@ -61,7 +62,6 @@ namespace PreciseTime {
             if (simManager.PlayerInfo.RaceFinished) {
 				PreciseTime::isEstimating = true;
             } else {
-                @PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
                 response.Decision = BFEvaluationDecision::DoNothing;
                 return;
             }
@@ -109,9 +109,9 @@ namespace PreciseTime {
 			}
         }
 
-		m_bfController.SaveSolutionToFile();
+		SaveInputsToFile(simManager);
         m_bfController.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
-        response.Decision = BFEvaluationDecision::Accept;
+		response.Decision = BFEvaluationDecision::Accept;
     }
 }
 
@@ -124,8 +124,6 @@ class BruteforceController {
         active = GetVariableString("controller") == "fic_pte";
         if (!active) return;
 
-        print("[AS] Starting bruteforce...");
-
         @m_simManager = simManager;
         m_simManager.InputEvents.RemoveAt(m_simManager.InputEvents.Length - 1);
 		m_simManager.SetSimulationTimeLimit(simManager.EventsDuration + 10010);
@@ -135,12 +133,16 @@ class BruteforceController {
         m_bestTimeEver = m_bestTime;
 		m_phase = BFPhase::Initial;
 		m_resultFileName = GetVariableString("fic_pte_file_name");
+		m_currentReplayIndex = 1;
 
         PreciseTime::isEstimating = false;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
         PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
         PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
+		
+		print("[PTE] Starting precise time extraction for input files " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
+		LoadInputsForReplayWithIndex(m_currentReplayIndex);
     }
 
     void OnSimulationStep(SimulationManager@ simManager) {
@@ -152,10 +154,10 @@ class BruteforceController {
 
         switch(info.Phase) {
             case BFPhase::Initial:
-                PreciseTime::HandleInitialPhase(m_simManager, response, info);
+                PreciseTime::HandleInitialPhase(simManager, response, info);
                 break;
             case BFPhase::Search:
-                PreciseTime::HandleSearchPhase(m_simManager, response, info);
+                PreciseTime::HandleSearchPhase(simManager, response, info);
                 break;
         }
 
@@ -164,22 +166,29 @@ class BruteforceController {
                 break;
 				
             case BFEvaluationDecision::Accept:
-                if (m_phase == BFPhase::Initial) {
-                    m_phase = BFPhase::Search;
-                    break;
-                }
-
-                m_phase = BFPhase::Initial;
+                m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
+				
+				if (m_phase == BFPhase::Initial) {
+					print("Replay with index " + m_currentReplayIndex + " finished! Loading next run...");
+					m_currentReplayIndex++;
+					
+					if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
+						print("All replays have been processed!");
+						OnSimulationEnd(simManager);
+						break;
+					}
+					
+					LoadInputsForReplayWithIndex(m_currentReplayIndex);
+					simManager.GiveUp();
+				}
+				
                 break;
+				
             case BFEvaluationDecision::Reject:
-                if (m_phase == BFPhase::Initial) {
-                    print("[AS] Cannot reject in initial phase, ignoring");
-                    break;
-                }
-
+                if (m_phase == BFPhase::Initial) print("[AS] Cannot reject in initial phase, ignoring");
                 break;
+				
             case BFEvaluationDecision::Stop:
-                print("[AS] Stopped");
                 OnSimulationEnd(simManager);
                 break;
         }
@@ -188,25 +197,19 @@ class BruteforceController {
     void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
         if (!active) return;
 
-        if (m_simManager.PlayerInfo.RaceFinished) {
-            m_simManager.PreventSimulationFinish();
+        if (simManager.PlayerInfo.RaceFinished) {
+            simManager.PreventSimulationFinish();
         }
     }
 	
 	void OnSimulationEnd(SimulationManager@ simManager) {
         if (!active) return;
         
-        print("[AS] Bruteforce finished");
         active = false;
         simManager.SetSimulationTimeLimit(0.0);
     }
+	
 
-    void SaveSolutionToFile() {
-		CommandList commandList;
-        commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + "\n";
-		commandList.Content += m_bfController.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-		commandList.Save(m_resultFileName);
-    }
 }
 
 void OnSimulationBegin(SimulationManager@ simManager) {
@@ -229,6 +232,20 @@ void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int targ
 
 void OnSimulationEnd(SimulationManager@ simManager, uint result) {
     m_bfController.OnSimulationEnd(simManager);
+}
+
+void SaveInputsToFile(SimulationManager@ simManager) {
+	CommandList commandList;
+	string preciseTime = DecimalFormatted(PreciseTime::bestPreciseTime, 16);
+	commandList.Content = "# Found precise time: " + preciseTime + "\n";
+	commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
+	commandList.Save(m_resultFileName + preciseTime + "_" + m_currentReplayIndex + ".txt");
+}
+
+void LoadInputsForReplayWithIndex(int index) {
+	CommandList commandList(m_resultFileName + m_currentReplayIndex + ".txt");
+	commandList.Process();
+	SetCurrentCommandList(commandList);
 }
 
 void RenderSettings() {
