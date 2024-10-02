@@ -31,7 +31,10 @@ namespace PreciseTime {
     SimulationState@ originalStateBeforeTargetHit;
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
+		// print("initial + " + simManager.PlayerInfo.RaceFinished + " | " + simManager.TickTime + " | " + simManager.RaceTime);
+		
 		if (!simManager.PlayerInfo.RaceFinished) {
+			//print("now saving " + m_currentReplayIndex);
 			@PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
 			response.Decision = BFEvaluationDecision::DoNothing;
 			return;
@@ -72,6 +75,7 @@ namespace PreciseTime {
         double currentCoeffPercentage = currentCoeff / 18446744073709551615.0;
 
         if (PreciseTime::coeffMax - PreciseTime::coeffMin > 1) {
+			//print("binary searching " + m_currentReplayIndex);
             vec3 LinearSpeed = simManager.Dyna.CurrentState.LinearSpeed;
             vec3 AngularSpeed = simManager.Dyna.CurrentState.AngularSpeed;
             LinearSpeed *= currentCoeffPercentage;
@@ -109,7 +113,7 @@ namespace PreciseTime {
 			}
         }
 
-		SaveInputsToFile(simManager);
+		SaveInputsToFile(simManager, foundPreciseTime);
         m_bfController.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
 		response.Decision = BFEvaluationDecision::Accept;
     }
@@ -119,6 +123,7 @@ class BruteforceController {
     SimulationManager@ m_simManager;
     bool active = false;
     BFPhase m_phase = BFPhase::Initial;
+	SimulationState@ startState;
 
     void OnSimulationBegin(SimulationManager@ simManager) {
         active = GetVariableString("controller") == "fic_pte";
@@ -127,6 +132,7 @@ class BruteforceController {
         @m_simManager = simManager;
         m_simManager.InputEvents.RemoveAt(m_simManager.InputEvents.Length - 1);
 		m_simManager.SetSimulationTimeLimit(simManager.EventsDuration + 10010);
+		
        
 		m_wasBaseRunFound = false;
         m_bestTime = simManager.EventsDuration;
@@ -142,11 +148,15 @@ class BruteforceController {
         PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
 		
 		print("[PTE] Starting precise time extraction for input files " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
-		LoadInputsForReplayWithIndex(m_currentReplayIndex);
+		LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
     }
 
     void OnSimulationStep(SimulationManager@ simManager) {
         if (!active) return;
+		
+		if (simManager.TickTime == 0) {
+			@startState = simManager.SaveState();
+		}
 
         BFEvaluationInfo info;
         info.Phase = m_phase;
@@ -178,8 +188,8 @@ class BruteforceController {
 						break;
 					}
 					
-					LoadInputsForReplayWithIndex(m_currentReplayIndex);
-					simManager.GiveUp();
+					LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
+					simManager.RewindToState(startState);
 				}
 				
                 break;
@@ -234,18 +244,25 @@ void OnSimulationEnd(SimulationManager@ simManager, uint result) {
     m_bfController.OnSimulationEnd(simManager);
 }
 
-void SaveInputsToFile(SimulationManager@ simManager) {
+void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime) {
 	CommandList commandList;
-	string preciseTime = DecimalFormatted(PreciseTime::bestPreciseTime, 16);
+	string preciseTime = DecimalFormatted(foundPreciseTime, 16);
 	commandList.Content = "# Found precise time: " + preciseTime + "\n";
 	commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-	commandList.Save(m_resultFileName + preciseTime + "_" + m_currentReplayIndex + ".txt");
+	commandList.Save(m_resultFileName + "_" + preciseTime + "_" + m_currentReplayIndex + ".txt");
 }
 
-void LoadInputsForReplayWithIndex(int index) {
+void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager) {
 	CommandList commandList(m_resultFileName + m_currentReplayIndex + ".txt");
-	commandList.Process();
+	commandList.Process(CommandListProcessOption::ExecuteImmediately);
 	SetCurrentCommandList(commandList);
+	
+	simManager.InputEvents.Clear();
+	
+	for (uint i = 0; i < commandList.InputCommands.Length; i++) {
+		InputCommand event = commandList.InputCommands[i];
+		simManager.InputEvents.Add(event.Timestamp, event.Type, event.State);
+	}
 }
 
 void RenderSettings() {
