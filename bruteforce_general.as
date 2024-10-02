@@ -29,73 +29,43 @@ namespace PreciseTime {
     SimulationState@ originalStateBeforeTargetHit;
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
-        int tickTime = simManager.TickTime;
-        bool targetReached = simManager.PlayerInfo.RaceFinished;
-        int maxTimeLimit = m_bestTime;
+		if (!simManager.PlayerInfo.RaceFinished) {
+			response.Decision = BFEvaluationDecision::DoNothing;
+			return;
+		}
 
-        if (targetReached) {
-            if (!m_wasBaseRunFound) {
-                print("[Initial phase] Found new base run with time: " +  (tickTime-10) + " sec", Severity::Success);
-                m_wasBaseRunFound = true;
-                m_bestTime = tickTime - 10;
-                PreciseTime::bestPreciseTime = (m_bestTime / 1000.0) + 0.01;
-                
-                if (m_bestTime < m_bestTimeEver) {
-                    m_bestTimeEver = m_bestTime;
-                    m_Manager.m_bfController.SaveSolutionToFile();
-                }
-            }
+        if (!m_wasBaseRunFound) {
+			print("[Initial phase] Found new base run with time: " +  (simManager.TickTime-10) + " sec", Severity::Success);
+			m_wasBaseRunFound = true;
+			m_bestTime = simManager.TickTime - 10;
+			PreciseTime::bestPreciseTime = (m_bestTime / 1000.0) + 0.01;
+			
+			if (m_bestTime < m_bestTimeEver) {
+				m_bestTimeEver = m_bestTime;
+			}
+		}
 
-            response.Decision = BFEvaluationDecision::Accept;
-            return;
-        }
-
-        if (tickTime > maxTimeLimit) {
-            if (!m_wasBaseRunFound) {
-                print("[Initial phase] Base run did not reach target, starting search for a base run..", Severity::Info);
-            } else {
-                // initial usually can only not reach the target once, and future initial phases will hit it, however i decided that if one were to change
-                // the position of the trigger during bruteforce, the target may not be reached anymore in initial phase, so we will allow the bruteforce
-                // to find yet another base run again
-                print("[Initial phase] Base run could not reach the target anymore, despite previously having reached it. Some bruteforcing condition must have changed. Starting search for a base run..", Severity::Info);
-                m_wasBaseRunFound = false;
-            }
-            
-            response.Decision = BFEvaluationDecision::Accept;
-            return;
-        }
-
-        response.Decision = BFEvaluationDecision::DoNothing;
+		response.Decision = BFEvaluationDecision::Accept;
     }
 
     void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
-        int tickTime = simManager.TickTime;
-        bool targetReached = simManager.PlayerInfo.RaceFinished;
-        int maxTimeLimit = m_bestTime;
-
-        if (!PreciseTime::isEstimating) {
-            if (!targetReached) {
-                if (tickTime > maxTimeLimit) {
-                    response.Decision = BFEvaluationDecision::Reject;
-                    return;
-                }
-
-                @PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
-                response.Decision = BFEvaluationDecision::DoNothing;
-                return;
-            } else {
-                PreciseTime::isEstimating = true;
-            }
-        } else {
-            if (targetReached) {
+        if (PreciseTime::isEstimating) {
+			if (simManager.PlayerInfo.RaceFinished) {
                 PreciseTime::coeffMax = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
             } else {
                 PreciseTime::coeffMin = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
             }
+        } else {
+            if (simManager.PlayerInfo.RaceFinished) {
+				PreciseTime::isEstimating = true;
+            } else {
+                @PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
+                response.Decision = BFEvaluationDecision::DoNothing;
+                return;
+            }
         }
 
         simManager.RewindToState(PreciseTime::originalStateBeforeTargetHit);
-        
         uint64 currentCoeff = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
         double currentCoeffPercentage = currentCoeff / 18446744073709551615.0;
 
@@ -115,33 +85,29 @@ namespace PreciseTime {
         PreciseTime::coeffMax = 18446744073709551615;
 
         double foundPreciseTime = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
-        double previousBestPreciseTime = PreciseTime::bestPreciseTime;
-        double maxPreciseTimeLimit = previousBestPreciseTime;
-
-        if (foundPreciseTime >= maxPreciseTimeLimit) {
-            response.Decision = BFEvaluationDecision::Reject;
-            return;
-        }
-
-        if (!m_wasBaseRunFound) {
+		
+		if (m_wasBaseRunFound) {
+			print("[Search phase] Found precise time: " + DecimalFormatted(foundPreciseTime, 16), Severity::Success);
+        } else {
             print("[Search phase] Found new base run with precise time: " +  DecimalFormatted(foundPreciseTime, 16) + " sec", Severity::Success);
             m_wasBaseRunFound = true;
-        } else {
-            print("[AS] Found precise time: " + DecimalFormatted(foundPreciseTime, 16), Severity::Success);
         }
 
-        PreciseTime::bestPreciseTime = foundPreciseTime;
-        m_bestTime = int(Math::Floor(PreciseTime::bestPreciseTime * 100.0)) * 10;
-        
-        if (PreciseTime::bestPreciseTime < PreciseTime::bestPreciseTimeEver) {
-            PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
-            m_Manager.m_bfController.SaveSolutionToFile();
-        }
-		
-        if (m_bestTime < m_bestTimeEver) {
-            m_bestTimeEver = m_bestTime;
+        if (foundPreciseTime < PreciseTime::bestPreciseTime) {
+            PreciseTime::bestPreciseTime = foundPreciseTime;
+			
+			if (PreciseTime::bestPreciseTime < PreciseTime::bestPreciseTimeEver) {
+				PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
+			}
+			
+			m_bestTime = int(Math::Floor(PreciseTime::bestPreciseTime * 100.0)) * 10;
+			
+			if (m_bestTime < m_bestTimeEver) {
+				m_bestTimeEver = m_bestTime;
+			}
         }
 
+		m_Manager.m_bfController.SaveSolutionToFile();
         m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
         response.Decision = BFEvaluationDecision::Accept;
     }
@@ -189,14 +155,6 @@ class BruteforceController {
         UpdateSettings();
 
         m_phase = BFPhase::Initial;
-    }
-
-    void OnSimulationEnd(SimulationManager@ simManager) {
-        if (!active) return;
-        
-        print("[AS] Bruteforce finished");
-        active = false;
-        simManager.SetSimulationTimeLimit(0.0);
     }
 
     void OnSimulationStep(SimulationManager@ simManager) {
@@ -248,6 +206,14 @@ class BruteforceController {
             m_simManager.PreventSimulationFinish();
         }
     }
+	
+	void OnSimulationEnd(SimulationManager@ simManager) {
+        if (!active) return;
+        
+        print("[AS] Bruteforce finished");
+        active = false;
+        simManager.SetSimulationTimeLimit(0.0);
+    }
 
     void SaveSolutionToFile() {
         // m_commandList.Content = simManager.InputEvents.ToCommandsText();
@@ -263,8 +229,6 @@ class BruteforceController {
     CommandList m_commandList;
     bool active = false;
     BFPhase m_phase = BFPhase::Initial;
-
-    private uint m_rewindIndex = 0;
 }
 
 class Manager {
