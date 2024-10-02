@@ -113,48 +113,32 @@ namespace PreciseTime {
     }
 }
 
-void UpdateSettings() {
-    SimulationManager@ simManager = m_Manager.m_simManager;
-
-    if (@simManager != null && m_Manager.m_bfController.active) {
-        m_Manager.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
-    }
-}
-
 class BruteforceController {
-    BruteforceController() {}
-    ~BruteforceController() {}
+    SimulationManager@ m_simManager;
+    bool active = false;
+    BFPhase m_phase = BFPhase::Initial;
 
-    void SetBruteforceVariables(SimulationManager@ simManager) {
-        m_wasBaseRunFound = false;
+    void OnSimulationBegin(SimulationManager@ simManager) {
+        active = GetVariableString("controller") == "fic_pte";
+        if (!active) return;
+
+        print("[AS] Starting bruteforce...");
+
+        @m_simManager = simManager;
+        m_simManager.InputEvents.RemoveAt(m_simManager.InputEvents.Length - 1);
+		m_simManager.SetSimulationTimeLimit(simManager.EventsDuration + 10010);
+       
+		m_wasBaseRunFound = false;
         m_bestTime = simManager.EventsDuration;
         m_bestTimeEver = m_bestTime;
+		m_phase = BFPhase::Initial;
+		m_resultFileName = GetVariableString("fic_pte_file_name");
 
         PreciseTime::isEstimating = false;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
         PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
         PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
-
-        m_resultFileName = GetVariableString("fic_pte_file_name");
-    }
-
-    void OnSimulationBegin(SimulationManager@ simManager) {
-        active = GetVariableString("controller") == "fic_pte";
-        if (!active) return;
-
-        print("[AS] Starting bruteforce..");
-
-        @m_simManager = simManager;
-
-        // knock off finish event from the input buffer
-        m_simManager.InputEvents.RemoveAt(m_simManager.InputEvents.Length - 1);
-        
-        // handle variables 
-        SetBruteforceVariables(simManager);
-        UpdateSettings();
-
-        m_phase = BFPhase::Initial;
     }
 
     void OnSimulationStep(SimulationManager@ simManager) {
@@ -216,22 +200,17 @@ class BruteforceController {
     }
 
     void SaveSolutionToFile() {
-        // m_commandList.Content = simManager.InputEvents.ToCommandsText();
-        // only save if the time we found is the best time ever, currently also saves when an equal time was found and accepted
-        if (PreciseTime::bestPreciseTime == PreciseTime::bestPreciseTimeEver) {
-			m_commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + "\n";
-			m_commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-			m_commandList.Save(m_resultFileName);
-		}
+		CommandList commandList;
+        commandList.Content = "# Found precise time: " + DecimalFormatted(PreciseTime::bestPreciseTime, 16) + "\n";
+		commandList.Content += m_Manager.m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
+		commandList.Save(m_resultFileName);
     }
-
-    SimulationManager@ m_simManager;
-    CommandList m_commandList;
-    bool active = false;
-    BFPhase m_phase = BFPhase::Initial;
 }
 
 class Manager {
+    SimulationManager@ m_simManager;
+    BruteforceController@ m_bfController;
+	
     Manager() {
         @m_bfController = BruteforceController();
     }
@@ -259,17 +238,10 @@ class Manager {
     void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
         m_bfController.OnCheckpointCountChanged(simManager, count, target);
     }
-
-    SimulationManager@ m_simManager;
-    BruteforceController@ m_bfController;
 }
 
 void OnSimulationBegin(SimulationManager@ simManager) {
     m_Manager.OnSimulationBegin(simManager);
-}
-
-void OnSimulationEnd(SimulationManager@ simManager, uint result) {
-    m_Manager.OnSimulationEnd(simManager, result);
 }
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
@@ -278,6 +250,10 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
     m_Manager.OnCheckpointCountChanged(simManager, count, target);
+}
+
+void OnSimulationEnd(SimulationManager@ simManager, uint result) {
+    m_Manager.OnSimulationEnd(simManager, result);
 }
 
 void BruteforceSettingsWindow() {
@@ -302,7 +278,6 @@ void BruteforceSettingsWindow() {
 void Main() {
     @m_Manager = Manager();
     RegisterVariable("fic_pte_file_name", "track");
-    UpdateSettings();
     RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", BruteforceSettingsWindow);
 }
 
