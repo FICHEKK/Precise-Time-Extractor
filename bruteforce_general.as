@@ -1,8 +1,8 @@
 // How to use:
 // 1. Convert all of your replay .Gbx files to TMI input files.
-// 2. Rename all of your TMI input files so they have the same name, but have increasing number suffix ("track0.txt", "track1.txt", "track2.txt"...).
+// 2. Rename all of your TMI input files so they have the same name, but have increasing number suffix ("track1.txt", "track2.txt", "track3.txt"...).
 // 3. Enter name of the track should be extracted ("track").
-// 4. Enter from which index to which index to extract from (if min index = 0 and max index = 2, extract will be done for "track0.txt", "track1.txt" and "track2.txt").
+// 4. Enter from which index to which index to extract from (if min index = 1 and max index = 3, extract will be done for "track1.txt", "track2.txt" and "track3.txt").
 
 Manager @m_Manager;
 
@@ -10,7 +10,10 @@ bool m_wasBaseRunFound = false;
 int m_bestTime;
 int m_bestTimeEver;
 string m_resultFileName;
-int currentReplayIndex = 0;
+int m_currentReplayIndex = 1;
+
+const int MIN_REPLAY_INDEX = 1;
+const int MAX_REPLAY_INDEX = 5;
 
 string DecimalFormatted(float number, int precision = 10) {
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
