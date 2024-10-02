@@ -208,7 +208,6 @@ class BruteforceController {
 
         m_phase = BFPhase::Initial;
         m_originalSimulationStates = array<SimulationState@>();
-        m_originalInputEvents.Clear();
         m_originalSimulationStates.Clear();
     }
 
@@ -218,22 +217,13 @@ class BruteforceController {
         print("[AS] Bruteforce finished");
         active = false;
 
-        m_originalInputEvents.Clear();
         m_originalSimulationStates.Clear();
         simManager.SetSimulationTimeLimit(0.0);
     }
 
     void RandomNeighbour() {
-        TM::InputEventBuffer@ inputBuffer = m_simManager.InputEvents;
-
         m_rewindIndex = 2147483647;
         uint lowestTimeModified = 2147483647;
-
-        // copy inputBuffer into m_originalInputEvents
-        m_originalInputEvents.Clear();
-        for (uint i = 0; i < inputBuffer.Length; i++) {
-            m_originalInputEvents.Add(inputBuffer[i]);
-        }
 
         if (lowestTimeModified == 0 || lowestTimeModified == 2147483647) {
             m_rewindIndex = 0;
@@ -268,7 +258,6 @@ class BruteforceController {
                     break;
                 }
 
-                m_originalInputEvents.Clear();
                 StartInitialPhase();
                 break;
             case BFEvaluationDecision::Reject:
@@ -277,7 +266,6 @@ class BruteforceController {
                     break;
                 }
 
-                RestoreInputBuffer();
                 StartNewIteration();
                 break;
             case BFEvaluationDecision::Stop:
@@ -285,14 +273,6 @@ class BruteforceController {
                 OnSimulationEnd(simManager);
                 break;
         }
-    }
-
-    void RestoreInputBuffer() {
-        m_simManager.InputEvents.Clear();
-        for (uint i = 0; i < m_originalInputEvents.Length; i++) {
-            m_simManager.InputEvents.Add(m_originalInputEvents[i]);
-        }
-        m_originalInputEvents.Clear();
     }
 
     void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
@@ -340,7 +320,6 @@ class BruteforceController {
     BFPhase m_phase = BFPhase::Initial;
 
     array<SimulationState@> m_originalSimulationStates = {};
-    array<TM::InputEvent> m_originalInputEvents; 
 
     private uint m_rewindIndex = 0;
 }
