@@ -172,24 +172,6 @@ class BruteforceController {
 
         m_resultFileName = GetVariableString("fic_pte_file_name");
     }
-    
-    void StartInitialPhase() {
-        m_phase = BFPhase::Initial;
-        m_simManager.RewindToState(m_originalSimulationStates[m_rewindIndex]);
-        m_originalSimulationStates.Resize(m_rewindIndex + 1);
-    }
-
-    void StartSearchPhase() {
-        m_phase = BFPhase::Search;
-
-        RandomNeighbour();
-        m_simManager.RewindToState(m_originalSimulationStates[m_rewindIndex]);
-    }
-
-    void StartNewIteration() {
-        RandomNeighbour();
-        m_simManager.RewindToState(m_originalSimulationStates[m_rewindIndex]);
-    }
 
     void OnSimulationBegin(SimulationManager@ simManager) {
         active = GetVariableString("controller") == "fic_pte";
@@ -207,8 +189,6 @@ class BruteforceController {
         UpdateSettings();
 
         m_phase = BFPhase::Initial;
-        m_originalSimulationStates = array<SimulationState@>();
-        m_originalSimulationStates.Clear();
     }
 
     void OnSimulationEnd(SimulationManager@ simManager) {
@@ -216,26 +196,7 @@ class BruteforceController {
         
         print("[AS] Bruteforce finished");
         active = false;
-
-        m_originalSimulationStates.Clear();
         simManager.SetSimulationTimeLimit(0.0);
-    }
-
-    void RandomNeighbour() {
-        m_rewindIndex = 2147483647;
-        uint lowestTimeModified = 2147483647;
-
-        if (lowestTimeModified == 0 || lowestTimeModified == 2147483647) {
-            m_rewindIndex = 0;
-        } else {
-            m_rewindIndex = lowestTimeModified / 10 - 1;
-        }
-
-        if (m_originalSimulationStates[m_originalSimulationStates.Length-1].PlayerInfo.RaceTime < int(m_rewindIndex * 10)) {
-            print("[AS] Rewind time is higher than highest saved simulation state, this can happen when custom stop time delta is > 0.0 and inputs were generated that occurred beyond the finish time that was driven during the initial phase. RandomNeighbour will be called again. If this keeps happening, lower the custom stop time.", Severity::Warning);
-            RandomNeighbour();
-        }
-
     }
 
     void OnSimulationStep(SimulationManager@ simManager) {
@@ -243,22 +204,28 @@ class BruteforceController {
 
         BFEvaluationInfo info;
         info.Phase = m_phase;
-        
-        BFEvaluationResponse evalResponse = OnBruteforceStep(simManager, info);
+		BFEvaluationResponse response;
 
-        switch(evalResponse.Decision) {
-            case BFEvaluationDecision::DoNothing:
-                if (m_phase == BFPhase::Initial) {
-                    CollectInitialPhaseData(simManager);
-                }
+        switch(info.Phase) {
+            case BFPhase::Initial:
+                PreciseTime::HandleInitialPhase(m_simManager, response, info);
                 break;
+            case BFPhase::Search:
+                PreciseTime::HandleSearchPhase(m_simManager, response, info);
+                break;
+        }
+
+        switch(response.Decision) {
+            case BFEvaluationDecision::DoNothing:
+                break;
+				
             case BFEvaluationDecision::Accept:
                 if (m_phase == BFPhase::Initial) {
-                    StartSearchPhase();
+                    m_phase = BFPhase::Search;
                     break;
                 }
 
-                StartInitialPhase();
+                m_phase = BFPhase::Initial;
                 break;
             case BFEvaluationDecision::Reject:
                 if (m_phase == BFPhase::Initial) {
@@ -266,7 +233,6 @@ class BruteforceController {
                     break;
                 }
 
-                StartNewIteration();
                 break;
             case BFEvaluationDecision::Stop:
                 print("[AS] Stopped");
@@ -283,27 +249,6 @@ class BruteforceController {
         }
     }
 
-    void CollectInitialPhaseData(SimulationManager@ simManager) {
-        if (simManager.RaceTime >= 0) {
-            m_originalSimulationStates.Add(m_simManager.SaveState());
-        }
-    }
-
-    BFEvaluationResponse@ OnBruteforceStep(SimulationManager@ simManager, const BFEvaluationInfo&in info) {
-        BFEvaluationResponse response;
-
-        switch(info.Phase) {
-            case BFPhase::Initial:
-                PreciseTime::HandleInitialPhase(m_simManager, response, info);
-                break;
-            case BFPhase::Search:
-                PreciseTime::HandleSearchPhase(m_simManager, response, info);
-                break;
-        }
-
-        return response;
-    }
-
     void SaveSolutionToFile() {
         // m_commandList.Content = simManager.InputEvents.ToCommandsText();
         // only save if the time we found is the best time ever, currently also saves when an equal time was found and accepted
@@ -318,8 +263,6 @@ class BruteforceController {
     CommandList m_commandList;
     bool active = false;
     BFPhase m_phase = BFPhase::Initial;
-
-    array<SimulationState@> m_originalSimulationStates = {};
 
     private uint m_rewindIndex = 0;
 }
