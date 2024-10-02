@@ -223,11 +223,6 @@ class BruteforceController {
         simManager.SetSimulationTimeLimit(0.0);
     }
 
-    void PrintInputBuffer() {
-        // somehow this doesnt show steering events properly after i filled in the missing inputs, but it does work for acceleration and brake
-        print(m_simManager.InputEvents.ToCommandsText(InputFormatFlags(3)));
-    }
-
     void RandomNeighbour() {
         TM::InputEventBuffer@ inputBuffer = m_simManager.InputEvents;
 
@@ -301,9 +296,7 @@ class BruteforceController {
     }
 
     void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
-        if (!active) {
-            return;
-        }
+        if (!active) return;
 
         if (m_simManager.PlayerInfo.RaceFinished) {
             m_simManager.PreventSimulationFinish();
@@ -316,23 +309,15 @@ class BruteforceController {
         }
     }
 
-    void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, BFEvaluationInfo&in info) {
-        PreciseTime::HandleSearchPhase(m_simManager, response, info);
-    }
-
-    void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, BFEvaluationInfo&in info) {
-        PreciseTime::HandleInitialPhase(m_simManager, response, info);
-    }
-
     BFEvaluationResponse@ OnBruteforceStep(SimulationManager@ simManager, const BFEvaluationInfo&in info) {
         BFEvaluationResponse response;
 
         switch(info.Phase) {
             case BFPhase::Initial:
-                HandleInitialPhase(simManager, response, info);
+                PreciseTime::HandleInitialPhase(m_simManager, response, info);
                 break;
             case BFPhase::Search:
-                HandleSearchPhase(simManager, response, info);
+                PreciseTime::HandleSearchPhase(m_simManager, response, info);
                 break;
         }
 
