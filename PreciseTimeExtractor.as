@@ -212,6 +212,7 @@ void RenderSettings()
 {
     RenderSettingsSection();
     RenderHowToUseSection();
+    RenderHowItWorksSection();
     RenderMotivationSection();
 }
 
@@ -278,6 +279,17 @@ void RenderHowToUseSection()
     UI::TextWrapped("6. If everything was setup correctly, new files with extracted precise times for each specified TMI input file will be generated in the folder specified by \"Output Folder\" setting (folder which is relative to TMI's \"Scripts\" folder).");
     UI::Dummy(vec2(0, 2));
     UI::TextWrapped("If \"Output Folder\" setting is empty, new files will be generated directly in TMI's \"Scripts\" folder.");
+    UI::Dummy(vec2(0, 8));
+}
+
+void RenderHowItWorksSection()
+{
+    RenderSectionTitle("How it works?");
+    UI::TextWrapped("Inner-workings of this plugin are very simple:");
+    UI::TextWrapped("1. Loads TMI inputs from a file.");
+    UI::TextWrapped("2. Resets car state to the start, resimulates full race and calculates the precise time.");
+    UI::TextWrapped("3. Saves results to a new file and performs all of the above steps again for the next file.");
+    UI::TextWrapped("4. When all files have been processed, force ends the simulation.");
     UI::Dummy(vec2(0, 8));
 }
 
