@@ -15,7 +15,8 @@ int m_currentReplayIndex = 1;
 int m_bestPreciseTimeIndex;
 string m_resultFileName;
 
-namespace PreciseTime {
+namespace PreciseTime
+{
 	double lastFound;
 	double bestFound;
 	
@@ -24,8 +25,10 @@ namespace PreciseTime {
     uint64 coeffMax = 18446744073709551615; 
     SimulationState@ stateBeforeFinishing;
 
-    void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
-		if (simManager.PlayerInfo.RaceFinished) {
+    void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info)
+	{
+		if (simManager.PlayerInfo.RaceFinished)
+		{
 			response.Decision = BFEvaluationDecision::Accept;
 			return;
 		}
@@ -34,17 +37,27 @@ namespace PreciseTime {
 		response.Decision = BFEvaluationDecision::DoNothing;
     }
 
-    void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
-        if (PreciseTime::isEstimating) {
-			if (simManager.PlayerInfo.RaceFinished) {
+    void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info)
+	{
+        if (PreciseTime::isEstimating)
+		{
+			if (simManager.PlayerInfo.RaceFinished)
+			{
                 PreciseTime::coeffMax = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
-            } else {
+            }
+			else
+			{
                 PreciseTime::coeffMin = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
             }
-        } else {
-            if (simManager.PlayerInfo.RaceFinished) {
+        }
+		else
+		{
+            if (simManager.PlayerInfo.RaceFinished)
+			{
 				PreciseTime::isEstimating = true;
-            } else {
+            }
+			else
+			{
                 response.Decision = BFEvaluationDecision::DoNothing;
                 return;
             }
@@ -54,7 +67,8 @@ namespace PreciseTime {
         uint64 currentCoeff = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
         double currentCoeffPercentage = currentCoeff / 18446744073709551615.0;
 
-        if (PreciseTime::coeffMax - PreciseTime::coeffMin > 1) {
+        if (PreciseTime::coeffMax - PreciseTime::coeffMin > 1)
+		{
             vec3 LinearSpeed = simManager.Dyna.CurrentState.LinearSpeed;
             vec3 AngularSpeed = simManager.Dyna.CurrentState.AngularSpeed;
             LinearSpeed *= currentCoeffPercentage;
@@ -75,7 +89,8 @@ namespace PreciseTime {
     }
 }
 
-void OnSimulationBegin(SimulationManager@ simManager) {
+void OnSimulationBegin(SimulationManager@ simManager)
+{
 	m_active = GetVariableString("controller") == "fic_pte";
     if (!m_active) return;
 		
@@ -96,29 +111,33 @@ void OnSimulationBegin(SimulationManager@ simManager) {
 	LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
 }
 
-void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
-	if (!m_active || userCancelled) {
+void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
+{
+	if (!m_active || userCancelled)
+	{
 		OnSimulationEnd(simManager, 0);
 		return;
 	}
 	
-	if (simManager.TickTime == 0) {
-		@m_startState = simManager.SaveState();
-	}
+	if (simManager.TickTime == 0) @m_startState = simManager.SaveState();
 
 	BFEvaluationInfo info;
 	info.Phase = m_phase;
 	BFEvaluationResponse response;
 	
-	if (info.Phase == BFPhase::Initial) {
+	if (info.Phase == BFPhase::Initial)
+	{
 		PreciseTime::HandleInitialPhase(simManager, response, info);
-	} else {
+	}
+	else
+	{
 		PreciseTime::HandleSearchPhase(simManager, response, info);
 	}
 	
 	if (response.Decision != BFEvaluationDecision::Accept) return;
 	
-	if (m_phase == BFPhase::Initial) {
+	if (m_phase == BFPhase::Initial)
+	{
 		m_phase = BFPhase::Search;
 		return;
 	}
@@ -129,7 +148,8 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 	m_phase = BFPhase::Initial;
 	m_currentReplayIndex++;
 	
-	if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
+	if (m_currentReplayIndex > MAX_REPLAY_INDEX)
+	{
 		Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + DecimalFormatted(PreciseTime::bestFound, 16) + ".");
 		OnSimulationEnd(simManager, 0);
 		return;
@@ -139,22 +159,22 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 	simManager.RewindToState(m_startState);
 }
 
-void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
+void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target)
+{
 	if (!m_active) return;
-
-	if (simManager.PlayerInfo.RaceFinished) {
-		simManager.PreventSimulationFinish();
-	}
+	if (simManager.PlayerInfo.RaceFinished) simManager.PreventSimulationFinish();
 }
 
-void OnSimulationEnd(SimulationManager@ simManager, uint result) {
+void OnSimulationEnd(SimulationManager@ simManager, uint result)
+{
 	if (!m_active) return;
 	
 	m_active = false;
 	simManager.SetSimulationTimeLimit(0.0);
 }
 
-void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime) {
+void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime)
+{
 	CommandList commandList;
 	string preciseTime = DecimalFormatted(foundPreciseTime, 16);
 	
@@ -165,33 +185,38 @@ void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime) {
 	Log("Saved precise time for input file \"" + m_resultFileName + "" + m_currentReplayIndex + "\": " + preciseTime, Severity::Success);
 }
 
-void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager) {
+void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager)
+{
 	CommandList commandList(m_resultFileName + m_currentReplayIndex + ".txt");
 	commandList.Process(CommandListProcessOption::ExecuteImmediately);
 	SetCurrentCommandList(commandList);
-	
 	simManager.InputEvents.Clear();
 	
-	for (uint i = 0; i < commandList.InputCommands.Length; i++) {
+	for (uint i = 0; i < commandList.InputCommands.Length; i++)
+	{
 		InputCommand event = commandList.InputCommands[i];
 		simManager.InputEvents.Add(event.Timestamp, event.Type, event.State);
 	}
 }
 
-string DecimalFormatted(float number, int precision = 10) {
+string DecimalFormatted(float number, int precision = 10)
+{
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
 }
 
-string DecimalFormatted(double number, int precision = 10) {
+string DecimalFormatted(double number, int precision = 10)
+{
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
 }
 
-void Log(string message, Severity severity = Severity :: Info) {
+void Log(string message, Severity severity = Severity :: Info)
+{
 	const string prefix = "[PTE]";
 	print(prefix + " " + message, severity);
 }
 
-void RenderSettings() {
+void RenderSettings()
+{
     UI::Dummy(vec2(0, 15));
 
     UI::TextDimmed("Options:");
@@ -201,21 +226,25 @@ void RenderSettings() {
     UI::Dummy(vec2(0, 15));
 
     UI::PushItemWidth(150);
-    if (!m_active) {
+    if (!m_active)
+	{
         m_resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
-    } else {
+    }
+	else
+	{
         UI::Text("File name " + m_resultFileName);
     }
     UI::PopItemWidth();
 }
 
-
-void Main() {
+void Main()
+{
     RegisterVariable("fic_pte_file_name", "track");
     RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", RenderSettings);
 }
 
-PluginInfo@ GetPluginInfo() {
+PluginInfo@ GetPluginInfo()
+{
     auto info = PluginInfo();
     info.Name = "fic's Precise Time Extractor";
     info.Author = "fic";
