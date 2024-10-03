@@ -7,6 +7,11 @@
 const int MIN_REPLAY_INDEX = 1;
 const int MAX_REPLAY_INDEX = 4;
 
+const string PLUGIN_ID = "fic_pte"; // fic = author, pte = Precise Time Extractor
+const string SETTING_BASE_REPLAY_NAME = PLUGIN_ID + "_base_replay_name";
+const string SETTING_MIN_REPLAY_INDEX = PLUGIN_ID + "_min_replay_index";
+const string SETTING_MAX_REPLAY_INDEX = PLUGIN_ID + "_max_replay_index";
+
 bool _isPluginSelectedByUser = false;
 SimulationState@ _stateAtRaceStart;
 int _currentReplayIndex = 1;
@@ -99,13 +104,13 @@ namespace PreciseTime
 
 void OnSimulationBegin(SimulationManager@ simManager)
 {
-    _isPluginSelectedByUser = GetVariableString("controller") == "fic_pte";
+    _isPluginSelectedByUser = GetVariableString("controller") == PLUGIN_ID;
     if (!_isPluginSelectedByUser) return;
         
     simManager.RemoveStateValidation();
     simManager.InputEvents.RemoveAt(simManager.InputEvents.Length - 1);
 
-    _resultFileName = GetVariableString("fic_pte_file_name");
+    _resultFileName = GetVariableString(SETTING_BASE_REPLAY_NAME);
     _currentReplayIndex = 1;
 
     PreciseTime::searchPhase = BFPhase::Initial;
@@ -211,7 +216,7 @@ void RenderSettings()
     UI::PushItemWidth(150);
     if (!_isPluginSelectedByUser)
     {
-        _resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
+        _resultFileName = UI::InputTextVar("File name", SETTING_BASE_REPLAY_NAME);
     }
     else
     {
@@ -222,8 +227,8 @@ void RenderSettings()
 
 void Main()
 {
-    RegisterVariable("fic_pte_file_name", "track");
-    RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", RenderSettings);
+    RegisterVariable(SETTING_BASE_REPLAY_NAME, "track");
+    RegisterValidationHandler(PLUGIN_ID, "fic's Precise Time Extractor", RenderSettings);
 }
 
 PluginInfo@ GetPluginInfo()
