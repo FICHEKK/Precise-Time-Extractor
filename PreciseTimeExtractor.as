@@ -232,6 +232,12 @@ void RenderSettings()
         _baseReplayName = UI::InputTextVar("Base Replay Name", SETTING_BASE_REPLAY_NAME);
         _minReplayIndex = UI::InputIntVar("Min Replay Index", SETTING_MIN_REPLAY_INDEX);
         _maxReplayIndex = UI::InputIntVar("Max Replay Index", SETTING_MAX_REPLAY_INDEX);
+        
+        if (_minReplayIndex > _maxReplayIndex)
+        {
+            _maxReplayIndex = _minReplayIndex;
+            SetVariable(SETTING_MAX_REPLAY_INDEX, _maxReplayIndex);
+        }
     }
 }
 
