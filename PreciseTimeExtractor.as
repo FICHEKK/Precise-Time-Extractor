@@ -27,7 +27,8 @@ namespace PreciseTime
     uint64 coeffMax = 18446744073709551615; 
     SimulationState@ stateBeforeFinishing;
     
-    bool Simulate(SimulationManager@ simManager)
+    // Returns true if calculating precise time for currently loaded replay has been complete.
+    bool Calculate(SimulationManager@ simManager)
     {
         BFEvaluationDecision decision = searchPhase == BFPhase::Initial
             ? PreciseTime::HandleInitialPhase(simManager)
@@ -125,8 +126,8 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
     
     if (simManager.TickTime == 0) @_stateAtRaceStart = simManager.SaveState();
 
-    bool finishedSimulatingCurrentReplay = PreciseTime::Simulate(simManager);
-    if (!finishedSimulatingCurrentReplay) return;
+    bool hasCalculatedPreciseTimeForCurrentReplay = PreciseTime::Calculate(simManager);
+    if (!hasCalculatedPreciseTimeForCurrentReplay) return;
 
     SaveInputsToFile(simManager, PreciseTime::lastFound);
     if (PreciseTime::lastFound == PreciseTime::bestFound) _bestReplayIndex = _currentReplayIndex;
