@@ -81,12 +81,8 @@ namespace PreciseTime
 
         if (PreciseTime::coeffMax - PreciseTime::coeffMin > 1)
         {
-            vec3 LinearSpeed = simManager.Dyna.CurrentState.LinearSpeed;
-            vec3 AngularSpeed = simManager.Dyna.CurrentState.AngularSpeed;
-            LinearSpeed *= currentCoeffPercentage;
-            AngularSpeed *= currentCoeffPercentage;
-            simManager.Dyna.CurrentState.LinearSpeed = LinearSpeed;
-            simManager.Dyna.CurrentState.AngularSpeed = AngularSpeed;
+            simManager.Dyna.CurrentState.LinearSpeed *= currentCoeffPercentage;
+            simManager.Dyna.CurrentState.AngularSpeed *= currentCoeffPercentage;
             return BFEvaluationDecision::DoNothing;
         }
 
