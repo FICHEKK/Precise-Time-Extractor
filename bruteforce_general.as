@@ -22,13 +22,13 @@ namespace PreciseTime {
     SimulationState@ originalStateBeforeTargetHit;
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
-		if (!simManager.PlayerInfo.RaceFinished) {
-			@PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
-			response.Decision = BFEvaluationDecision::DoNothing;
+		if (simManager.PlayerInfo.RaceFinished) {
+			response.Decision = BFEvaluationDecision::Accept;
 			return;
 		}
 
-		response.Decision = BFEvaluationDecision::Accept;
+		@PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
+		response.Decision = BFEvaluationDecision::DoNothing;
     }
 
     void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
@@ -100,9 +100,7 @@ void OnSimulationBegin(SimulationManager@ simManager) {
 }
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
-	if (!m_active) return;
-	
-	if (userCancelled) {
+	if (!m_active || userCancelled) {
 		OnSimulationEnd(simManager, 0);
 		return;
 	}
@@ -114,48 +112,29 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 	BFEvaluationInfo info;
 	info.Phase = m_phase;
 	BFEvaluationResponse response;
-
-	switch(info.Phase) {
-		case BFPhase::Initial:
-			PreciseTime::HandleInitialPhase(simManager, response, info);
-			break;
-		case BFPhase::Search:
-			PreciseTime::HandleSearchPhase(simManager, response, info);
-			break;
+	
+	if (info.Phase == BFPhase::Initial) {
+		PreciseTime::HandleInitialPhase(simManager, response, info);
+	} else {
+		PreciseTime::HandleSearchPhase(simManager, response, info);
 	}
-
-	switch(response.Decision) {
-		case BFEvaluationDecision::DoNothing:
-			break;
-			
-		case BFEvaluationDecision::Accept:
-			m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
-			
-			if (m_phase == BFPhase::Initial) {
-				m_currentReplayIndex++;
-				
-				if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
-					string bestPreciseTimeFound = DecimalFormatted(m_bestPreciseTimeFound, 16);
-					Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + bestPreciseTimeFound + ".");
-					OnSimulationEnd(simManager, 0);
-					break;
-				}
-				
-				LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
-				simManager.RewindToState(m_startState);
-			}
-			
-			break;
-		
-		// TODO: Delete
-		case BFEvaluationDecision::Reject:
-			if (m_phase == BFPhase::Initial) Log("[AS] Cannot reject in initial phase, ignoring");
-			break;
-			
-		case BFEvaluationDecision::Stop:
-			OnSimulationEnd(simManager, 0);
-			break;
+	
+	if (response.Decision != BFEvaluationDecision::Accept) return;
+	
+	m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
+	if (m_phase == BFPhase::Search) return;
+	
+	m_currentReplayIndex++;
+	
+	if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
+		string bestPreciseTimeFound = DecimalFormatted(m_bestPreciseTimeFound, 16);
+		Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + bestPreciseTimeFound + ".");
+		OnSimulationEnd(simManager, 0);
+		return;
 	}
+	
+	LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
+	simManager.RewindToState(m_startState);
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
