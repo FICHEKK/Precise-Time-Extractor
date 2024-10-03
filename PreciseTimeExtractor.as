@@ -4,6 +4,7 @@ const string PLUGIN_ID = "fic_pte"; // fic = author, pte = Precise Time Extracto
 const string SETTING_BASE_REPLAY_NAME = PLUGIN_ID + "_base_replay_name";
 const string SETTING_MIN_REPLAY_INDEX = PLUGIN_ID + "_min_replay_index";
 const string SETTING_MAX_REPLAY_INDEX = PLUGIN_ID + "_max_replay_index";
+const string SETTING_OUTPUT_FOLDER = PLUGIN_ID + "_output_folder";
 
 bool _isPluginCurrentlyUsed = false;
 SimulationState@ _stateAtRaceStart;
@@ -13,6 +14,7 @@ int _bestReplayIndex;
 string _baseReplayName;
 int _minReplayIndex;
 int _maxReplayIndex;
+string _outputFolder;
 
 namespace PreciseTime
 {
@@ -109,6 +111,7 @@ void OnSimulationBegin(SimulationManager@ simManager)
     _baseReplayName = GetVariableString(SETTING_BASE_REPLAY_NAME);
     _currentReplayIndex = int(GetVariableDouble(SETTING_MIN_REPLAY_INDEX));
     _bestReplayIndex = _currentReplayIndex;
+    _outputFolder = GetVariableString(SETTING_OUTPUT_FOLDER);
 
     PreciseTime::searchPhase = BFPhase::Initial;
     PreciseTime::isEstimating = false;
@@ -169,7 +172,10 @@ void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime)
     
     commandList.Content = "# Found precise time: " + preciseTime + "\n";
     commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-    commandList.Save(_baseReplayName + "_" + preciseTime + "_" + _currentReplayIndex + ".txt");
+    
+    string folderToSaveTo = "";
+    if (_outputFolder != "") folderToSaveTo = _outputFolder + "\\";
+    commandList.Save(folderToSaveTo + _baseReplayName + "_" + preciseTime + "_" + _currentReplayIndex + ".txt");
     
     Log("Saved precise time for input file \"" + _baseReplayName + "" + _currentReplayIndex + "\": " + preciseTime, Severity::Success);
 }
@@ -205,6 +211,7 @@ void Main()
     RegisterVariable(SETTING_BASE_REPLAY_NAME, "track");
     RegisterVariable(SETTING_MIN_REPLAY_INDEX, 1);
     RegisterVariable(SETTING_MAX_REPLAY_INDEX, 5);
+    RegisterVariable(SETTING_OUTPUT_FOLDER, PLUGIN_NAME);
     
     RegisterValidationHandler(PLUGIN_ID, PLUGIN_NAME, RenderSettings);
 }
@@ -231,6 +238,7 @@ void RenderSettingsSection()
     _baseReplayName = UI::InputTextVar("Base Replay Name", SETTING_BASE_REPLAY_NAME);
     _minReplayIndex = UI::InputIntVar("Min Replay Index", SETTING_MIN_REPLAY_INDEX);
     _maxReplayIndex = UI::InputIntVar("Max Replay Index", SETTING_MAX_REPLAY_INDEX);
+    _outputFolder = UI::InputTextVar("Output Folder", SETTING_OUTPUT_FOLDER);
     
     if (_minReplayIndex > _maxReplayIndex)
     {
