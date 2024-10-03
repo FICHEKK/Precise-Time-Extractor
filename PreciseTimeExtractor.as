@@ -7,12 +7,12 @@
 const int MIN_REPLAY_INDEX = 1;
 const int MAX_REPLAY_INDEX = 4;
 
-bool m_active = false;
-SimulationState@ m_startState;
+bool _active = false;
+SimulationState@ _startState;
 
-int m_currentReplayIndex = 1;
-int m_bestPreciseTimeIndex;
-string m_resultFileName;
+int _currentReplayIndex = 1;
+int _bestPreciseTimeIndex;
+string _resultFileName;
 
 namespace PreciseTime
 {
@@ -100,14 +100,14 @@ namespace PreciseTime
 
 void OnSimulationBegin(SimulationManager@ simManager)
 {
-    m_active = GetVariableString("controller") == "fic_pte";
-    if (!m_active) return;
+    _active = GetVariableString("controller") == "fic_pte";
+    if (!_active) return;
         
     simManager.RemoveStateValidation();
     simManager.InputEvents.RemoveAt(simManager.InputEvents.Length - 1);
 
-    m_resultFileName = GetVariableString("fic_pte_file_name");
-    m_currentReplayIndex = 1;
+    _resultFileName = GetVariableString("fic_pte_file_name");
+    _currentReplayIndex = 1;
 
     PreciseTime::searchPhase = BFPhase::Initial;
     PreciseTime::isEstimating = false;
@@ -116,48 +116,48 @@ void OnSimulationBegin(SimulationManager@ simManager)
     PreciseTime::bestFound = Math::UINT64_MAX;
     
     int totalInputFiles = MAX_REPLAY_INDEX - MIN_REPLAY_INDEX + 1;
-    Log("Starting precise time extraction for " + totalInputFiles + " input files: " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
-    LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
+    Log("Starting precise time extraction for " + totalInputFiles + " input files: " + _resultFileName + MIN_REPLAY_INDEX + ", ... , " + _resultFileName + MAX_REPLAY_INDEX);
+    LoadInputsForReplayWithIndex(_currentReplayIndex, simManager);
 }
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
 {
-    if (!m_active || userCancelled)
+    if (!_active || userCancelled)
     {
         OnSimulationEnd(simManager, 0);
         return;
     }
     
-    if (simManager.TickTime == 0) @m_startState = simManager.SaveState();
+    if (simManager.TickTime == 0) @_startState = simManager.SaveState();
 
     bool finishedSimulatingCurrentReplay = PreciseTime::Simulate(simManager);
     if (!finishedSimulatingCurrentReplay) return;
 
     SaveInputsToFile(simManager, PreciseTime::lastFound);
-    if (PreciseTime::lastFound == PreciseTime::bestFound) m_bestPreciseTimeIndex = m_currentReplayIndex;
+    if (PreciseTime::lastFound == PreciseTime::bestFound) _bestPreciseTimeIndex = _currentReplayIndex;
     
-    if (++m_currentReplayIndex > MAX_REPLAY_INDEX)
+    if (++_currentReplayIndex > MAX_REPLAY_INDEX)
     {
-        Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
+        Log("All replays have been processed! Best replay was \"" + _resultFileName + "" + _bestPreciseTimeIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
         OnSimulationEnd(simManager, 0);
         return;
     }
     
-    LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
-    simManager.RewindToState(m_startState);
+    LoadInputsForReplayWithIndex(_currentReplayIndex, simManager);
+    simManager.RewindToState(_startState);
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target)
 {
-    if (!m_active) return;
+    if (!_active) return;
     if (simManager.PlayerInfo.RaceFinished) simManager.PreventSimulationFinish();
 }
 
 void OnSimulationEnd(SimulationManager@ simManager, uint result)
 {
-    if (!m_active) return;
+    if (!_active) return;
     
-    m_active = false;
+    _active = false;
     simManager.SetSimulationTimeLimit(0.0);
 }
 
@@ -168,14 +168,14 @@ void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime)
     
     commandList.Content = "# Found precise time: " + preciseTime + "\n";
     commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-    commandList.Save(m_resultFileName + "_" + preciseTime + "_" + m_currentReplayIndex + ".txt");
+    commandList.Save(_resultFileName + "_" + preciseTime + "_" + _currentReplayIndex + ".txt");
     
-    Log("Saved precise time for input file \"" + m_resultFileName + "" + m_currentReplayIndex + "\": " + preciseTime, Severity::Success);
+    Log("Saved precise time for input file \"" + _resultFileName + "" + _currentReplayIndex + "\": " + preciseTime, Severity::Success);
 }
 
 void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager)
 {
-    CommandList commandList(m_resultFileName + m_currentReplayIndex + ".txt");
+    CommandList commandList(_resultFileName + _currentReplayIndex + ".txt");
     commandList.Process(CommandListProcessOption::ExecuteImmediately);
     SetCurrentCommandList(commandList);
     simManager.InputEvents.Clear();
@@ -210,13 +210,13 @@ void RenderSettings()
     UI::Dummy(vec2(0, 15));
 
     UI::PushItemWidth(150);
-    if (!m_active)
+    if (!_active)
     {
-        m_resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
+        _resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
     }
     else
     {
-        UI::Text("File name " + m_resultFileName);
+        UI::Text("File name " + _resultFileName);
     }
     UI::PopItemWidth();
 }
