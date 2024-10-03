@@ -7,11 +7,10 @@
 const int MIN_REPLAY_INDEX = 1;
 const int MAX_REPLAY_INDEX = 4;
 
-bool _active = false;
-SimulationState@ _startState;
-
+bool _isPluginSelectedByUser = false;
+SimulationState@ _stateAtRaceStart;
 int _currentReplayIndex = 1;
-int _bestPreciseTimeIndex;
+int _bestReplayIndex;
 string _resultFileName;
 
 namespace PreciseTime
@@ -100,8 +99,8 @@ namespace PreciseTime
 
 void OnSimulationBegin(SimulationManager@ simManager)
 {
-    _active = GetVariableString("controller") == "fic_pte";
-    if (!_active) return;
+    _isPluginSelectedByUser = GetVariableString("controller") == "fic_pte";
+    if (!_isPluginSelectedByUser) return;
         
     simManager.RemoveStateValidation();
     simManager.InputEvents.RemoveAt(simManager.InputEvents.Length - 1);
@@ -122,42 +121,42 @@ void OnSimulationBegin(SimulationManager@ simManager)
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
 {
-    if (!_active || userCancelled)
+    if (!_isPluginSelectedByUser || userCancelled)
     {
         OnSimulationEnd(simManager, 0);
         return;
     }
     
-    if (simManager.TickTime == 0) @_startState = simManager.SaveState();
+    if (simManager.TickTime == 0) @_stateAtRaceStart = simManager.SaveState();
 
     bool finishedSimulatingCurrentReplay = PreciseTime::Simulate(simManager);
     if (!finishedSimulatingCurrentReplay) return;
 
     SaveInputsToFile(simManager, PreciseTime::lastFound);
-    if (PreciseTime::lastFound == PreciseTime::bestFound) _bestPreciseTimeIndex = _currentReplayIndex;
+    if (PreciseTime::lastFound == PreciseTime::bestFound) _bestReplayIndex = _currentReplayIndex;
     
     if (++_currentReplayIndex > MAX_REPLAY_INDEX)
     {
-        Log("All replays have been processed! Best replay was \"" + _resultFileName + "" + _bestPreciseTimeIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
+        Log("All replays have been processed! Best replay was \"" + _resultFileName + "" + _bestReplayIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
         OnSimulationEnd(simManager, 0);
         return;
     }
     
     LoadInputsForReplayWithIndex(_currentReplayIndex, simManager);
-    simManager.RewindToState(_startState);
+    simManager.RewindToState(_stateAtRaceStart);
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target)
 {
-    if (!_active) return;
+    if (!_isPluginSelectedByUser) return;
     if (simManager.PlayerInfo.RaceFinished) simManager.PreventSimulationFinish();
 }
 
 void OnSimulationEnd(SimulationManager@ simManager, uint result)
 {
-    if (!_active) return;
+    if (!_isPluginSelectedByUser) return;
     
-    _active = false;
+    _isPluginSelectedByUser = false;
     simManager.SetSimulationTimeLimit(0.0);
 }
 
@@ -210,7 +209,7 @@ void RenderSettings()
     UI::Dummy(vec2(0, 15));
 
     UI::PushItemWidth(150);
-    if (!_active)
+    if (!_isPluginSelectedByUser)
     {
         _resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
     }
