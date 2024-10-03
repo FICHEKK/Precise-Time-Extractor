@@ -6,6 +6,7 @@
 # Installation
 1. Download `PreciseTimeExtractor.as`.
 2. Place it inside your TMI `Plugins` folder (on Windows, it is usually located at `C:\Users\User\Documents\TMInterface\Plugins`).
+3. To activate it inside TMI, go to `Settings/Bruteforce` and select `fic's Precise Time Extractor` from the dropdown.
 
 # How to use?
 1. Convert all of your replay `.Gbx` files to TMI input files. You can do that easily via online tool: [TMI inputs extractor](https://io.gbx.tools/extract-inputs-tmi)<br/><br/>
@@ -15,7 +16,7 @@ For example, if your `Base Replay Name` is set to `track`, your TMI input files 
 4. Set `Min Replay Index` and `Max Replay Index` to define range of TMI input files for which precise times should be extracted.<br/>
 For example, if `Base Replay Name` = `track`, `Min Replay Index` = `1` and `Max Replay Index` = `3`, TMI input files `track1.txt`, `track2.txt` and `track3.txt` will be extracted.<br/><br/>
 5. In Trackmania, go to `Editors\Edit a Replay` and select some replay (has to be a replay of the same track as the one you are extracting inputs for), press `Launch` and finally `fic's Precise Time Extractor`.<br/><br/>
-6. If everything was setup correctly, new files with extracted precise times for each specified TMI input file will be generated in the folder specified by `Output Folder` setting (folder which is relative to TMI's `Scripts` folder).<br/>
+6. If everything was setup correctly, new files with extracted precise times for each specified TMI input file will be generated in the folder specified by `Output Folder` setting (folder which is relative to TMI's `Scripts` folder).
 If `Output Folder` setting is empty, new files will be generated directly in TMI's `Scripts` folder.
 
 # How it works?
