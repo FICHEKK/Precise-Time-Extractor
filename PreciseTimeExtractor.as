@@ -129,7 +129,7 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
     bool hasCalculatedPreciseTimeForCurrentReplay = PreciseTime::Calculate(simManager);
     if (!hasCalculatedPreciseTimeForCurrentReplay) return;
 
-    SaveInputsToFile(simManager, PreciseTime::lastFound);
+    SavePreciseTimeForCurrentReplay(simManager);
     if (PreciseTime::lastFound == PreciseTime::bestFound) _bestReplayIndex = _currentReplayIndex;
     
     if (++_currentReplayIndex > _maxReplayIndex)
@@ -157,12 +157,12 @@ void OnSimulationEnd(SimulationManager@ simManager, uint result)
     simManager.SetSimulationTimeLimit(0.0);
 }
 
-void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime)
+void SavePreciseTimeForCurrentReplay(SimulationManager@ simManager)
 {
-    CommandList commandList;
-    string preciseTime = FormatDouble(foundPreciseTime);
+    string preciseTime = FormatDouble(PreciseTime::lastFound);
     
-    commandList.Content = "# Found precise time: " + preciseTime + "\n";
+    CommandList commandList;
+    commandList.Content = "# Precise time: " + preciseTime + "\n";
     commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
     
     string folderToSaveTo = "";
