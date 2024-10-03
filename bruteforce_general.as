@@ -150,7 +150,7 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
 	
 	if (m_currentReplayIndex > MAX_REPLAY_INDEX)
 	{
-		Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + DecimalFormatted(PreciseTime::bestFound, 16) + ".");
+		Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
 		OnSimulationEnd(simManager, 0);
 		return;
 	}
@@ -176,7 +176,7 @@ void OnSimulationEnd(SimulationManager@ simManager, uint result)
 void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime)
 {
 	CommandList commandList;
-	string preciseTime = DecimalFormatted(foundPreciseTime, 16);
+	string preciseTime = FormatDouble(foundPreciseTime);
 	
 	commandList.Content = "# Found precise time: " + preciseTime + "\n";
 	commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
@@ -199,20 +199,16 @@ void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager)
 	}
 }
 
-string DecimalFormatted(float number, int precision = 10)
-{
-    return Text::FormatFloat(number, "{0:10f}", 0, precision);
-}
-
-string DecimalFormatted(double number, int precision = 10)
-{
-    return Text::FormatFloat(number, "{0:10f}", 0, precision);
-}
-
 void Log(string message, Severity severity = Severity :: Info)
 {
 	const string prefix = "[PTE]";
 	print(prefix + " " + message, severity);
+}
+
+string FormatDouble(double value)
+{
+	const int precision = 16;
+    return Text::FormatFloat(value, "", 0, precision);
 }
 
 void RenderSettings()
