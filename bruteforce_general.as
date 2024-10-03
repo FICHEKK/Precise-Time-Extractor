@@ -7,19 +7,22 @@
 const int MIN_REPLAY_INDEX = 1;
 const int MAX_REPLAY_INDEX = 4;
 
-string m_resultFileName;
-int m_currentReplayIndex = 1;
 bool m_active = false;
-BFPhase m_phase = BFPhase::Initial;
 SimulationState@ m_startState;
-double m_bestPreciseTimeFound;
+BFPhase m_phase = BFPhase::Initial;
+
+int m_currentReplayIndex = 1;
 int m_bestPreciseTimeIndex;
+string m_resultFileName;
 
 namespace PreciseTime {
+	double lastFound;
+	double bestFound;
+	
     bool isEstimating = false;
     uint64 coeffMin = 0;
     uint64 coeffMax = 18446744073709551615; 
-    SimulationState@ originalStateBeforeTargetHit;
+    SimulationState@ stateBeforeFinishing;
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
 		if (simManager.PlayerInfo.RaceFinished) {
@@ -27,7 +30,7 @@ namespace PreciseTime {
 			return;
 		}
 
-		@PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
+		@PreciseTime::stateBeforeFinishing = simManager.SaveState();
 		response.Decision = BFEvaluationDecision::DoNothing;
     }
 
@@ -47,7 +50,7 @@ namespace PreciseTime {
             }
         }
 
-        simManager.RewindToState(PreciseTime::originalStateBeforeTargetHit);
+        simManager.RewindToState(PreciseTime::stateBeforeFinishing);
         uint64 currentCoeff = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
         double currentCoeffPercentage = currentCoeff / 18446744073709551615.0;
 
@@ -65,15 +68,9 @@ namespace PreciseTime {
         PreciseTime::isEstimating = false;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
+		PreciseTime::lastFound = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
+		if (PreciseTime::lastFound < PreciseTime::bestFound) PreciseTime::bestFound = PreciseTime::lastFound;
 
-        double foundPreciseTime = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
-
-        if (foundPreciseTime < m_bestPreciseTimeFound) {
-            m_bestPreciseTimeFound = foundPreciseTime;
-			m_bestPreciseTimeIndex = m_currentReplayIndex;
-        }
-
-		SaveInputsToFile(simManager, foundPreciseTime);
 		response.Decision = BFEvaluationDecision::Accept;
     }
 }
@@ -88,11 +85,11 @@ void OnSimulationBegin(SimulationManager@ simManager) {
 	m_phase = BFPhase::Initial;
 	m_resultFileName = GetVariableString("fic_pte_file_name");
 	m_currentReplayIndex = 1;
-	m_bestPreciseTimeFound = Math::UINT64_MAX;
 
 	PreciseTime::isEstimating = false;
 	PreciseTime::coeffMin = 0;
 	PreciseTime::coeffMax = 18446744073709551615;
+	PreciseTime::bestFound = Math::UINT64_MAX;
 	
 	int totalInputFiles = MAX_REPLAY_INDEX - MIN_REPLAY_INDEX + 1;
 	Log("Starting precise time extraction for " + totalInputFiles + " input files: " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
@@ -121,14 +118,19 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 	
 	if (response.Decision != BFEvaluationDecision::Accept) return;
 	
-	m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
-	if (m_phase == BFPhase::Search) return;
+	if (m_phase == BFPhase::Initial) {
+		m_phase = BFPhase::Search;
+		return;
+	}
+
+	SaveInputsToFile(simManager, PreciseTime::lastFound);
+	if (PreciseTime::lastFound == PreciseTime::bestFound) m_bestPreciseTimeIndex = m_currentReplayIndex;
 	
+	m_phase = BFPhase::Initial;
 	m_currentReplayIndex++;
 	
 	if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
-		string bestPreciseTimeFound = DecimalFormatted(m_bestPreciseTimeFound, 16);
-		Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + bestPreciseTimeFound + ".");
+		Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + DecimalFormatted(PreciseTime::bestFound, 16) + ".");
 		OnSimulationEnd(simManager, 0);
 		return;
 	}
