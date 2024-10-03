@@ -22,7 +22,7 @@ namespace PreciseTime
     double bestFound;
     
     BFPhase searchPhase = BFPhase::Initial;
-    bool isEstimating = false;
+    bool isFirstSearchIteration = true;
     uint64 coeffMin = 0;
     uint64 coeffMax = 18446744073709551615; 
     SimulationState@ stateBeforeFinishing;
@@ -52,7 +52,13 @@ namespace PreciseTime
 
     BFEvaluationDecision HandleSearchPhase(SimulationManager@ simManager)
     {
-        if (PreciseTime::isEstimating)
+        if (PreciseTime::isFirstSearchIteration)
+        {
+            // We can't modify coefficient in the first iteration as we first need to simulate
+            // the 0.5 coefficient to determine in which way to continue the binary search.
+            PreciseTime::isFirstSearchIteration = false;
+        }
+        else
         {
             if (simManager.PlayerInfo.RaceFinished)
             {
@@ -61,17 +67,6 @@ namespace PreciseTime
             else
             {
                 PreciseTime::coeffMin = PreciseTime::coeffMin + (PreciseTime::coeffMax - PreciseTime::coeffMin) / 2;
-            }
-        }
-        else
-        {
-            if (simManager.PlayerInfo.RaceFinished)
-            {
-                PreciseTime::isEstimating = true;
-            }
-            else
-            {
-                return BFEvaluationDecision::DoNothing;
             }
         }
 
@@ -86,7 +81,7 @@ namespace PreciseTime
             return BFEvaluationDecision::DoNothing;
         }
 
-        PreciseTime::isEstimating = false;
+        PreciseTime::isFirstSearchIteration = true;
         PreciseTime::coeffMin = 0;
         PreciseTime::coeffMax = 18446744073709551615;
         PreciseTime::lastFound = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
@@ -110,7 +105,7 @@ void OnSimulationBegin(SimulationManager@ simManager)
     _outputFolder = GetVariableString(SETTING_OUTPUT_FOLDER);
 
     PreciseTime::searchPhase = BFPhase::Initial;
-    PreciseTime::isEstimating = false;
+    PreciseTime::isFirstSearchIteration = true;
     PreciseTime::coeffMin = 0;
     PreciseTime::coeffMax = 18446744073709551615;
     PreciseTime::bestFound = Math::UINT64_MAX;
