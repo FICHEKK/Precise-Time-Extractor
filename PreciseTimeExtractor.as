@@ -257,13 +257,13 @@ void RenderHowToUseSection()
 {
     RenderSectionTitle("How to use?");
     
-    UI::TextWrapped("1. Convert all of your replay .Gbx files to TMI input files. You can do that easily via online tool:");
+    UI::TextWrapped("1. Convert all of your replay \".Gbx\" files to TMI input files. You can do that easily via online tool:");
     UI::Dummy(vec2(0, 2));
     UI::TextWrapped("https://io.gbx.tools/extract-inputs-tmi");
     
     RenderSeparator();
     
-    UI::TextWrapped("2. Move all of your TMI input files to the \"Scripts\" folder of the TMI (on Windows, this is usually located at \"C:\\Users\\User\\Documents\\TMInterface\\Scripts\").");
+    UI::TextWrapped("2. Move all of your TMI input files to TMI's \"Scripts\" folder (on Windows, this is usually located at \"C:\\Users\\User\\Documents\\TMInterface\\Scripts\").");
     
     RenderSeparator();
     
@@ -280,13 +280,17 @@ void RenderHowToUseSection()
     RenderSeparator();
     
     UI::TextWrapped("5. In Trackmania, go to \"Editors\\Edit a Replay\" and select some replay (has to be a replay of the same track as the one you are extracting inputs for), press \"Launch\" and finally \"" + PLUGIN_NAME + "\".");
+    
+    RenderSeparator();
+    
+    UI::TextWrapped("6. If everything was setup correctly, new files with extracted precise times for each specified TMI input file will be generated in the folder specified by \"Output Folder\" setting (folder which is relative to TMI's \"Scripts\" folder).");
     UI::Dummy(vec2(0, 2));
-    UI::TextWrapped("If everything was setup correctly, new files with extracted precise times for each specified TMI input file will be generated in the \"Scripts\" folder.");
+    UI::TextWrapped("If \"Output Folder\" setting is empty, new files will be generated directly in TMI's \"Scripts\" folder.");
+    UI::Dummy(vec2(0, 8));
 }
 
 void RenderMotivationSection()
 {
-    UI::Dummy(vec2(0, 16));
     RenderSectionTitle("Motivation");
     
     UI::TextWrapped("The reason I made this plugin was to solve my own problem.");
