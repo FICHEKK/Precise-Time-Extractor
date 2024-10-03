@@ -1,10 +1,6 @@
-// How to use:
-// 1. Convert all of your replay .Gbx files to TMI input files.
-// 2. Rename all of your TMI input files so they have the same name, but have increasing number suffix ("track1.txt", "track2.txt", "track3.txt"...).
-// 3. Enter name of the track should be extracted ("track").
-// 4. Enter from which index to which index to extract from (if min index = 1 and max index = 3, extract will be done for "track1.txt", "track2.txt" and "track3.txt").
-
+const string PLUGIN_NAME = "fic's Precise Time Extractor";
 const string PLUGIN_ID = "fic_pte"; // fic = author, pte = Precise Time Extractor
+
 const string SETTING_BASE_REPLAY_NAME = PLUGIN_ID + "_base_replay_name";
 const string SETTING_MIN_REPLAY_INDEX = PLUGIN_ID + "_min_replay_index";
 const string SETTING_MAX_REPLAY_INDEX = PLUGIN_ID + "_max_replay_index";
@@ -210,41 +206,102 @@ void Main()
     RegisterVariable(SETTING_MIN_REPLAY_INDEX, 1);
     RegisterVariable(SETTING_MAX_REPLAY_INDEX, 5);
     
-    RegisterValidationHandler(PLUGIN_ID, "fic's Precise Time Extractor", RenderSettings);
+    RegisterValidationHandler(PLUGIN_ID, PLUGIN_NAME, RenderSettings);
 }
 
 void RenderSettings()
 {
-    UI::Dummy(vec2(0, 8));
-    UI::TextDimmed("Settings");
-    UI::Dummy(vec2(0, 2));
-    UI::Separator();
-    UI::Dummy(vec2(0, 2));
+    RenderSettingsSection();
+    RenderHowToUseSection();
+    RenderMotivationSection();
+}
+
+void RenderSettingsSection()
+{
+    RenderSectionTitle("Settings");
 
     if (_isPluginCurrentlyUsed)
     {
         UI::Text("Base Replay Name: " + _baseReplayName);
         UI::Text("Min Replay Index: " + _minReplayIndex);
         UI::Text("Max Replay Index: " + _maxReplayIndex);
+        return;
     }
-    else
+    
+    _baseReplayName = UI::InputTextVar("Base Replay Name", SETTING_BASE_REPLAY_NAME);
+    _minReplayIndex = UI::InputIntVar("Min Replay Index", SETTING_MIN_REPLAY_INDEX);
+    _maxReplayIndex = UI::InputIntVar("Max Replay Index", SETTING_MAX_REPLAY_INDEX);
+    
+    if (_minReplayIndex > _maxReplayIndex)
     {
-        _baseReplayName = UI::InputTextVar("Base Replay Name", SETTING_BASE_REPLAY_NAME);
-        _minReplayIndex = UI::InputIntVar("Min Replay Index", SETTING_MIN_REPLAY_INDEX);
-        _maxReplayIndex = UI::InputIntVar("Max Replay Index", SETTING_MAX_REPLAY_INDEX);
-        
-        if (_minReplayIndex > _maxReplayIndex)
-        {
-            _maxReplayIndex = _minReplayIndex;
-            SetVariable(SETTING_MAX_REPLAY_INDEX, _maxReplayIndex);
-        }
+        _maxReplayIndex = _minReplayIndex;
+        SetVariable(SETTING_MAX_REPLAY_INDEX, _maxReplayIndex);
     }
+}
+
+void RenderHowToUseSection()
+{
+    RenderSectionTitle("How to use?");
+    
+    UI::TextWrapped("1. Convert all of your replay .Gbx files to TMI input files. You can do that easily via online tool:");
+    UI::Dummy(vec2(0, 2));
+    UI::TextWrapped("https://io.gbx.tools/extract-inputs-tmi");
+    
+    RenderSeparator();
+    
+    UI::TextWrapped("2. Move all of your TMI input files to the \"Scripts\" folder of the TMI (on Windows, this is usually located at \"C:\\Users\\User\\Documents\\TMInterface\\Scripts\").");
+    
+    RenderSeparator();
+    
+    UI::TextWrapped("3. Rename all of your TMI input files so that they have the same base name (specified by \"Base Replay Name\" setting above), but have increasing number suffix.");
+    UI::Dummy(vec2(0, 2));
+    UI::TextWrapped("For example, if your \"Base Replay Name\" is set to \"track\", your TMI input files should be \"track1.txt\", \"track2.txt\", \"track3.txt\" and so on.");
+    
+    RenderSeparator();
+    
+    UI::TextWrapped("4. Set \"Min Replay Index\" and \"Max Replay Index\" to define range of TMI input files for which precise times should be extracted.");
+    UI::Dummy(vec2(0, 2));
+    UI::TextWrapped("For example, if \"Base Replay Name\" = \"track\", \"Min Replay Index\" = 1 and \"Max Replay Index\" = 3, TMI input files \"track1.txt\", \"track2.txt\" and \"track3.txt\" will be extracted.");
+    
+    RenderSeparator();
+    
+    UI::TextWrapped("5. In Trackmania, go to \"Editors\\Edit a Replay\" and select some replay (has to be a replay of the same track as the one you are extracting inputs for), press \"Launch\" and finally \"" + PLUGIN_NAME + "\".");
+    UI::Dummy(vec2(0, 2));
+    UI::TextWrapped("If everything was setup correctly, new files with extracted precise times for each specified TMI input file will be generated in the \"Scripts\" folder.");
+}
+
+void RenderMotivationSection()
+{
+    UI::Dummy(vec2(0, 16));
+    RenderSectionTitle("Motivation");
+    
+    UI::TextWrapped("The reason I made this plugin was to solve my own problem.");
+    UI::Dummy(vec2(0, 8));
+    UI::TextWrapped("I had 344 replay files of a short track that were all equal to 2 digits (all were timed 9.84) and I wanted to see which ones were the closest to 9.83.");
+    UI::Dummy(vec2(0, 8));
+    UI::TextWrapped("Extracting precise times of 344 replays by manually validating each would take forever, so instead I decided to solve this problem once and for all! :)");
+    UI::Dummy(vec2(0, 8));
+    UI::TextWrapped("-fic");
+}
+
+void RenderSectionTitle(string title)
+{
+    UI::Dummy(vec2(0, 8));
+    UI::TextDimmed(title);
+    RenderSeparator(2);
+}
+
+void RenderSeparator(float margin = 4)
+{
+    UI::Dummy(vec2(0, margin));
+    UI::Separator();
+    UI::Dummy(vec2(0, margin));
 }
 
 PluginInfo@ GetPluginInfo()
 {
     auto info = PluginInfo();
-    info.Name = "fic's Precise Time Extractor";
+    info.Name = PLUGIN_NAME;
     info.Author = "fic";
     info.Version = "v1.0.0";
     info.Description = "Plugin that allows you to automatically extract precise times of multiple replay input files.";
