@@ -4,37 +4,28 @@
 // 3. Enter name of the track should be extracted ("track").
 // 4. Enter from which index to which index to extract from (if min index = 1 and max index = 3, extract will be done for "track1.txt", "track2.txt" and "track3.txt").
 
-BruteforceController@ m_bfController;
+const int MIN_REPLAY_INDEX = 1;
+const int MAX_REPLAY_INDEX = 4;
+
 bool m_wasBaseRunFound = false;
 int m_bestTime;
 int m_bestTimeEver;
 string m_resultFileName;
 int m_currentReplayIndex = 1;
-
-const int MIN_REPLAY_INDEX = 1;
-const int MAX_REPLAY_INDEX = 3;
-
-string DecimalFormatted(float number, int precision = 10) {
-    return Text::FormatFloat(number, "{0:10f}", 0, precision);
-}
-
-string DecimalFormatted(double number, int precision = 10) {
-    return Text::FormatFloat(number, "{0:10f}", 0, precision);
-}
+bool m_active = false;
+BFPhase m_phase = BFPhase::Initial;
+SimulationState@ m_startState;
 
 namespace PreciseTime {
-    double bestPreciseTime; // best precise time the bf found so far
-    double bestPreciseTimeEver; // keeps track for the best precise time ever reached, useful for bf that allows for worse times to be found
+    double bestPreciseTime;
+    double bestPreciseTimeEver;
     bool isEstimating = false;
     uint64 coeffMin = 0;
     uint64 coeffMax = 18446744073709551615; 
     SimulationState@ originalStateBeforeTargetHit;
 
     void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info) {
-		// print("initial + " + simManager.PlayerInfo.RaceFinished + " | " + simManager.TickTime + " | " + simManager.RaceTime);
-		
 		if (!simManager.PlayerInfo.RaceFinished) {
-			//print("now saving " + m_currentReplayIndex);
 			@PreciseTime::originalStateBeforeTargetHit = simManager.SaveState();
 			response.Decision = BFEvaluationDecision::DoNothing;
 			return;
@@ -75,7 +66,6 @@ namespace PreciseTime {
         double currentCoeffPercentage = currentCoeff / 18446744073709551615.0;
 
         if (PreciseTime::coeffMax - PreciseTime::coeffMin > 1) {
-			//print("binary searching " + m_currentReplayIndex);
             vec3 LinearSpeed = simManager.Dyna.CurrentState.LinearSpeed;
             vec3 AngularSpeed = simManager.Dyna.CurrentState.AngularSpeed;
             LinearSpeed *= currentCoeffPercentage;
@@ -114,134 +104,107 @@ namespace PreciseTime {
         }
 
 		SaveInputsToFile(simManager, foundPreciseTime);
-        m_bfController.m_simManager.SetSimulationTimeLimit(m_bestTime + 10010);
+        simManager.SetSimulationTimeLimit(m_bestTime + 10010);
 		response.Decision = BFEvaluationDecision::Accept;
     }
 }
 
-class BruteforceController {
-    SimulationManager@ m_simManager;
-    bool active = false;
-    BFPhase m_phase = BFPhase::Initial;
-	SimulationState@ startState;
-
-    void OnSimulationBegin(SimulationManager@ simManager) {
-        active = GetVariableString("controller") == "fic_pte";
-        if (!active) return;
-
-        @m_simManager = simManager;
-        m_simManager.InputEvents.RemoveAt(m_simManager.InputEvents.Length - 1);
-		m_simManager.SetSimulationTimeLimit(simManager.EventsDuration + 10010);
-		
-       
-		m_wasBaseRunFound = false;
-        m_bestTime = simManager.EventsDuration;
-        m_bestTimeEver = m_bestTime;
-		m_phase = BFPhase::Initial;
-		m_resultFileName = GetVariableString("fic_pte_file_name");
-		m_currentReplayIndex = 1;
-
-        PreciseTime::isEstimating = false;
-        PreciseTime::coeffMin = 0;
-        PreciseTime::coeffMax = 18446744073709551615;
-        PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
-        PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
-		
-		print("[PTE] Starting precise time extraction for input files " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
-		LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
-    }
-
-    void OnSimulationStep(SimulationManager@ simManager) {
-        if (!active) return;
-		
-		if (simManager.TickTime == 0) {
-			@startState = simManager.SaveState();
-		}
-
-        BFEvaluationInfo info;
-        info.Phase = m_phase;
-		BFEvaluationResponse response;
-
-        switch(info.Phase) {
-            case BFPhase::Initial:
-                PreciseTime::HandleInitialPhase(simManager, response, info);
-                break;
-            case BFPhase::Search:
-                PreciseTime::HandleSearchPhase(simManager, response, info);
-                break;
-        }
-
-        switch(response.Decision) {
-            case BFEvaluationDecision::DoNothing:
-                break;
-				
-            case BFEvaluationDecision::Accept:
-                m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
-				
-				if (m_phase == BFPhase::Initial) {
-					print("Replay with index " + m_currentReplayIndex + " finished! Loading next run...");
-					m_currentReplayIndex++;
-					
-					if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
-						print("All replays have been processed!");
-						OnSimulationEnd(simManager);
-						break;
-					}
-					
-					LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
-					simManager.RewindToState(startState);
-				}
-				
-                break;
-				
-            case BFEvaluationDecision::Reject:
-                if (m_phase == BFPhase::Initial) print("[AS] Cannot reject in initial phase, ignoring");
-                break;
-				
-            case BFEvaluationDecision::Stop:
-                OnSimulationEnd(simManager);
-                break;
-        }
-    }
-
-    void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
-        if (!active) return;
-
-        if (simManager.PlayerInfo.RaceFinished) {
-            simManager.PreventSimulationFinish();
-        }
-    }
-	
-	void OnSimulationEnd(SimulationManager@ simManager) {
-        if (!active) return;
-        
-        active = false;
-        simManager.SetSimulationTimeLimit(0.0);
-    }
-	
-
-}
-
 void OnSimulationBegin(SimulationManager@ simManager) {
+	m_active = GetVariableString("controller") == "fic_pte";
+    if (!m_active) return;
+		
 	simManager.RemoveStateValidation();
-	m_bfController.OnSimulationBegin(simManager);
+	simManager.InputEvents.RemoveAt(simManager.InputEvents.Length - 1);
+	simManager.SetSimulationTimeLimit(simManager.EventsDuration + 10010);
+   
+	m_wasBaseRunFound = false;
+	m_bestTime = simManager.EventsDuration;
+	m_bestTimeEver = m_bestTime;
+	m_phase = BFPhase::Initial;
+	m_resultFileName = GetVariableString("fic_pte_file_name");
+	m_currentReplayIndex = 1;
+
+	PreciseTime::isEstimating = false;
+	PreciseTime::coeffMin = 0;
+	PreciseTime::coeffMax = 18446744073709551615;
+	PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
+	PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
+	
+	print("[PTE] Starting precise time extraction for input files " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
+	LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
 }
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
+	if (!m_active) return;
+	
 	if (userCancelled) {
-		m_bfController.OnSimulationEnd(simManager);
+		OnSimulationEnd(simManager, 0);
 		return;
 	}
+	
+	if (simManager.TickTime == 0) {
+		@m_startState = simManager.SaveState();
+	}
 
-	m_bfController.OnSimulationStep(simManager);
+	BFEvaluationInfo info;
+	info.Phase = m_phase;
+	BFEvaluationResponse response;
+
+	switch(info.Phase) {
+		case BFPhase::Initial:
+			PreciseTime::HandleInitialPhase(simManager, response, info);
+			break;
+		case BFPhase::Search:
+			PreciseTime::HandleSearchPhase(simManager, response, info);
+			break;
+	}
+
+	switch(response.Decision) {
+		case BFEvaluationDecision::DoNothing:
+			break;
+			
+		case BFEvaluationDecision::Accept:
+			m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
+			
+			if (m_phase == BFPhase::Initial) {
+				print("Replay with index " + m_currentReplayIndex + " finished! Loading next run...");
+				m_currentReplayIndex++;
+				
+				if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
+					print("All replays have been processed!");
+					OnSimulationEnd(simManager, 0);
+					break;
+				}
+				
+				LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
+				simManager.RewindToState(m_startState);
+			}
+			
+			break;
+			
+		case BFEvaluationDecision::Reject:
+			if (m_phase == BFPhase::Initial) print("[AS] Cannot reject in initial phase, ignoring");
+			break;
+			
+		case BFEvaluationDecision::Stop:
+			OnSimulationEnd(simManager, 0);
+			break;
+	}
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target) {
-    m_bfController.OnCheckpointCountChanged(simManager, count, target);
+	if (!m_active) return;
+
+	if (simManager.PlayerInfo.RaceFinished) {
+		simManager.PreventSimulationFinish();
+	}
 }
 
 void OnSimulationEnd(SimulationManager@ simManager, uint result) {
-    m_bfController.OnSimulationEnd(simManager);
+	if (!m_active) return;
+	
+	m_active = false;
+	simManager.SetSimulationTimeLimit(0.0);
 }
 
 void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime) {
@@ -265,6 +228,14 @@ void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager) {
 	}
 }
 
+string DecimalFormatted(float number, int precision = 10) {
+    return Text::FormatFloat(number, "{0:10f}", 0, precision);
+}
+
+string DecimalFormatted(double number, int precision = 10) {
+    return Text::FormatFloat(number, "{0:10f}", 0, precision);
+}
+
 void RenderSettings() {
     UI::Dummy(vec2(0, 15));
 
@@ -275,7 +246,7 @@ void RenderSettings() {
     UI::Dummy(vec2(0, 15));
 
     UI::PushItemWidth(150);
-    if (!m_bfController.active) {
+    if (!m_active) {
         m_resultFileName = UI::InputTextVar("File name", "fic_pte_file_name");
     } else {
         UI::Text("File name " + m_resultFileName);
@@ -285,7 +256,6 @@ void RenderSettings() {
 
 
 void Main() {
-    @m_bfController = BruteforceController();
     RegisterVariable("fic_pte_file_name", "track");
     RegisterValidationHandler("fic_pte", "fic's Precise Time Extractor", RenderSettings);
 }
