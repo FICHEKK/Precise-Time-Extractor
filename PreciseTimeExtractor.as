@@ -240,6 +240,12 @@ void RenderSettingsSection()
     _maxReplayIndex = UI::InputIntVar("Max Replay Index", SETTING_MAX_REPLAY_INDEX);
     _outputFolder = UI::InputTextVar("Output Folder", SETTING_OUTPUT_FOLDER);
     
+    if (_minReplayIndex < 0)
+    {
+        _minReplayIndex = 0;
+        SetVariable(SETTING_MIN_REPLAY_INDEX, _minReplayIndex);
+    }
+    
     if (_minReplayIndex > _maxReplayIndex)
     {
         _maxReplayIndex = _minReplayIndex;
