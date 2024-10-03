@@ -32,7 +32,6 @@ namespace PreciseTime {
 		}
 
         if (!m_wasBaseRunFound) {
-			print("[Initial phase] Found new base run with time: " +  (simManager.TickTime-10) + " sec", Severity::Success);
 			m_wasBaseRunFound = true;
 			m_bestTime = simManager.TickTime - 10;
 			PreciseTime::bestPreciseTime = (m_bestTime / 1000.0) + 0.01;
@@ -83,9 +82,9 @@ namespace PreciseTime {
         double foundPreciseTime = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
 		
 		if (m_wasBaseRunFound) {
-			print("[Search phase] Found precise time: " + DecimalFormatted(foundPreciseTime, 16), Severity::Success);
+			Log("[Search phase] Found precise time: " + DecimalFormatted(foundPreciseTime, 16), Severity::Success);
         } else {
-            print("[Search phase] Found new base run with precise time: " +  DecimalFormatted(foundPreciseTime, 16) + " sec", Severity::Success);
+            Log("[Search phase] Found new base run with precise time: " +  DecimalFormatted(foundPreciseTime, 16) + " sec", Severity::Success);
             m_wasBaseRunFound = true;
         }
 
@@ -130,7 +129,8 @@ void OnSimulationBegin(SimulationManager@ simManager) {
 	PreciseTime::bestPreciseTime = double(m_bestTime + 10) / 1000.0;
 	PreciseTime::bestPreciseTimeEver = PreciseTime::bestPreciseTime;
 	
-	print("[PTE] Starting precise time extraction for input files " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
+	int totalInputFiles = MAX_REPLAY_INDEX - MIN_REPLAY_INDEX + 1;
+	Log("Starting precise time extraction for " + totalInputFiles + " input files: " + m_resultFileName + MIN_REPLAY_INDEX + ", ... , " + m_resultFileName + MAX_REPLAY_INDEX);
 	LoadInputsForReplayWithIndex(m_currentReplayIndex, simManager);
 }
 
@@ -167,11 +167,11 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 			m_phase = m_phase == BFPhase::Initial ? BFPhase::Search : BFPhase::Initial;
 			
 			if (m_phase == BFPhase::Initial) {
-				print("Replay with index " + m_currentReplayIndex + " finished! Loading next run...");
+				Log("Replay with index " + m_currentReplayIndex + " finished! Loading next run...");
 				m_currentReplayIndex++;
 				
 				if (m_currentReplayIndex > MAX_REPLAY_INDEX) {
-					print("All replays have been processed!");
+					Log("All replays have been processed!");
 					OnSimulationEnd(simManager, 0);
 					break;
 				}
@@ -181,9 +181,10 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled) {
 			}
 			
 			break;
-			
+		
+		// TODO: Delete
 		case BFEvaluationDecision::Reject:
-			if (m_phase == BFPhase::Initial) print("[AS] Cannot reject in initial phase, ignoring");
+			if (m_phase == BFPhase::Initial) Log("[AS] Cannot reject in initial phase, ignoring");
 			break;
 			
 		case BFEvaluationDecision::Stop:
@@ -234,6 +235,11 @@ string DecimalFormatted(float number, int precision = 10) {
 
 string DecimalFormatted(double number, int precision = 10) {
     return Text::FormatFloat(number, "{0:10f}", 0, precision);
+}
+
+void Log(string message, Severity severity = Severity :: Info) {
+	const string prefix = "[PTE]";
+	print(prefix + " " + message, severity);
 }
 
 void RenderSettings() {
