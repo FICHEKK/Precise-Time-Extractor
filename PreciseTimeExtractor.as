@@ -205,10 +205,10 @@ void Main()
     RegisterVariable(SETTING_MAX_REPLAY_INDEX, 5);
     RegisterVariable(SETTING_OUTPUT_FOLDER, PLUGIN_NAME);
     
-    RegisterValidationHandler(PLUGIN_ID, PLUGIN_NAME, RenderSettings);
+    RegisterValidationHandler(PLUGIN_ID, PLUGIN_NAME, RenderPluginUserInterface);
 }
 
-void RenderSettings()
+void RenderPluginUserInterface()
 {
     RenderSettingsSection();
     RenderHowToUseSection();
