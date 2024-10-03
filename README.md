@@ -1,6 +1,8 @@
 # What is it?
 `Precise Time Extractor` is a [Trackmania Interface (TMI)](https://donadigo.com/tminterface/) plugin that allows users to easily extract precise times (times that are not limited to 2 decimals) of multiple TMI input files at once.
 
+![Demonstration](Demonstration.gif)
+
 # Installation
 1. Download `PreciseTimeExtractor.as`.
 2. Place it inside your TMI `Plugins` folder (on Windows, it is usually located at `C:\Users\User\Documents\TMInterface\Plugins`).
