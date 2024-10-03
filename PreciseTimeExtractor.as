@@ -112,6 +112,7 @@ void OnSimulationBegin(SimulationManager@ simManager)
 
     _baseReplayName = GetVariableString(SETTING_BASE_REPLAY_NAME);
     _currentReplayIndex = int(GetVariableDouble(SETTING_MIN_REPLAY_INDEX));
+    _bestReplayIndex = _currentReplayIndex;
 
     PreciseTime::searchPhase = BFPhase::Initial;
     PreciseTime::isEstimating = false;
@@ -120,7 +121,7 @@ void OnSimulationBegin(SimulationManager@ simManager)
     PreciseTime::bestFound = Math::UINT64_MAX;
     
     int totalInputFiles = _maxReplayIndex - _minReplayIndex + 1;
-    Log("Starting precise time extraction for " + totalInputFiles + " input files: " + _baseReplayName + _minReplayIndex + ", ... , " + _baseReplayName + _maxReplayIndex);
+    Log("Starting precise time extraction for " + totalInputFiles + " input file" + (totalInputFiles > 1 ? "s" : "") + "...");
     LoadInputsForReplayWithIndex(_currentReplayIndex, simManager);
 }
 
@@ -191,7 +192,7 @@ void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager)
     }
 }
 
-void Log(string message, Severity severity = Severity :: Info)
+void Log(string message, Severity severity = Severity::Info)
 {
     const string prefix = "[PTE]";
     print(prefix + " " + message, severity);
