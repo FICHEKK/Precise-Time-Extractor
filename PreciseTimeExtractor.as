@@ -9,7 +9,6 @@ const int MAX_REPLAY_INDEX = 4;
 
 bool m_active = false;
 SimulationState@ m_startState;
-BFPhase m_phase = BFPhase::Initial;
 
 int m_currentReplayIndex = 1;
 int m_bestPreciseTimeIndex;
@@ -20,24 +19,36 @@ namespace PreciseTime
     double lastFound;
     double bestFound;
     
+    BFPhase searchPhase = BFPhase::Initial;
     bool isEstimating = false;
     uint64 coeffMin = 0;
     uint64 coeffMax = 18446744073709551615; 
     SimulationState@ stateBeforeFinishing;
-
-    void HandleInitialPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info)
+    
+    bool Simulate(SimulationManager@ simManager)
     {
-        if (simManager.PlayerInfo.RaceFinished)
-        {
-            response.Decision = BFEvaluationDecision::Accept;
-            return;
-        }
-
-        @PreciseTime::stateBeforeFinishing = simManager.SaveState();
-        response.Decision = BFEvaluationDecision::DoNothing;
+        BFEvaluationDecision decision = searchPhase == BFPhase::Initial
+            ? PreciseTime::HandleInitialPhase(simManager)
+            : PreciseTime::HandleSearchPhase(simManager);
+            
+        if (decision != BFEvaluationDecision::Accept) return false;
+        
+        PreciseTime::searchPhase = PreciseTime::searchPhase == BFPhase::Initial
+            ? BFPhase::Search
+            : BFPhase::Initial;
+            
+        return PreciseTime::searchPhase == BFPhase::Initial;
     }
 
-    void HandleSearchPhase(SimulationManager@ simManager, BFEvaluationResponse&out response, const BFEvaluationInfo&in info)
+    BFEvaluationDecision HandleInitialPhase(SimulationManager@ simManager)
+    {
+        if (simManager.PlayerInfo.RaceFinished) return BFEvaluationDecision::Accept;
+
+        @PreciseTime::stateBeforeFinishing = simManager.SaveState();
+        return BFEvaluationDecision::DoNothing;
+    }
+
+    BFEvaluationDecision HandleSearchPhase(SimulationManager@ simManager)
     {
         if (PreciseTime::isEstimating)
         {
@@ -58,8 +69,7 @@ namespace PreciseTime
             }
             else
             {
-                response.Decision = BFEvaluationDecision::DoNothing;
-                return;
+                return BFEvaluationDecision::DoNothing;
             }
         }
 
@@ -75,8 +85,7 @@ namespace PreciseTime
             AngularSpeed *= currentCoeffPercentage;
             simManager.Dyna.CurrentState.LinearSpeed = LinearSpeed;
             simManager.Dyna.CurrentState.AngularSpeed = AngularSpeed;
-            response.Decision = BFEvaluationDecision::DoNothing;
-            return;
+            return BFEvaluationDecision::DoNothing;
         }
 
         PreciseTime::isEstimating = false;
@@ -85,7 +94,7 @@ namespace PreciseTime
         PreciseTime::lastFound = (simManager.RaceTime / 1000.0) + (currentCoeffPercentage / 100.0);
         if (PreciseTime::lastFound < PreciseTime::bestFound) PreciseTime::bestFound = PreciseTime::lastFound;
 
-        response.Decision = BFEvaluationDecision::Accept;
+        return BFEvaluationDecision::Accept;
     }
 }
 
@@ -97,10 +106,10 @@ void OnSimulationBegin(SimulationManager@ simManager)
     simManager.RemoveStateValidation();
     simManager.InputEvents.RemoveAt(simManager.InputEvents.Length - 1);
 
-    m_phase = BFPhase::Initial;
     m_resultFileName = GetVariableString("fic_pte_file_name");
     m_currentReplayIndex = 1;
 
+    PreciseTime::searchPhase = BFPhase::Initial;
     PreciseTime::isEstimating = false;
     PreciseTime::coeffMin = 0;
     PreciseTime::coeffMax = 18446744073709551615;
@@ -121,34 +130,13 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
     
     if (simManager.TickTime == 0) @m_startState = simManager.SaveState();
 
-    BFEvaluationInfo info;
-    info.Phase = m_phase;
-    BFEvaluationResponse response;
-    
-    if (info.Phase == BFPhase::Initial)
-    {
-        PreciseTime::HandleInitialPhase(simManager, response, info);
-    }
-    else
-    {
-        PreciseTime::HandleSearchPhase(simManager, response, info);
-    }
-    
-    if (response.Decision != BFEvaluationDecision::Accept) return;
-    
-    if (m_phase == BFPhase::Initial)
-    {
-        m_phase = BFPhase::Search;
-        return;
-    }
+    bool finishedSimulatingCurrentReplay = PreciseTime::Simulate(simManager);
+    if (!finishedSimulatingCurrentReplay) return;
 
     SaveInputsToFile(simManager, PreciseTime::lastFound);
     if (PreciseTime::lastFound == PreciseTime::bestFound) m_bestPreciseTimeIndex = m_currentReplayIndex;
     
-    m_phase = BFPhase::Initial;
-    m_currentReplayIndex++;
-    
-    if (m_currentReplayIndex > MAX_REPLAY_INDEX)
+    if (++m_currentReplayIndex > MAX_REPLAY_INDEX)
     {
         Log("All replays have been processed! Best replay was \"" + m_resultFileName + "" + m_bestPreciseTimeIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
         OnSimulationEnd(simManager, 0);
