@@ -4,19 +4,19 @@
 // 3. Enter name of the track should be extracted ("track").
 // 4. Enter from which index to which index to extract from (if min index = 1 and max index = 3, extract will be done for "track1.txt", "track2.txt" and "track3.txt").
 
-const int MIN_REPLAY_INDEX = 1;
-const int MAX_REPLAY_INDEX = 4;
-
 const string PLUGIN_ID = "fic_pte"; // fic = author, pte = Precise Time Extractor
 const string SETTING_BASE_REPLAY_NAME = PLUGIN_ID + "_base_replay_name";
 const string SETTING_MIN_REPLAY_INDEX = PLUGIN_ID + "_min_replay_index";
 const string SETTING_MAX_REPLAY_INDEX = PLUGIN_ID + "_max_replay_index";
 
-bool _isPluginSelectedByUser = false;
+bool _isPluginCurrentlyUsed = false;
 SimulationState@ _stateAtRaceStart;
-int _currentReplayIndex = 1;
+int _currentReplayIndex;
 int _bestReplayIndex;
-string _resultFileName;
+
+string _baseReplayName;
+int _minReplayIndex;
+int _maxReplayIndex;
 
 namespace PreciseTime
 {
@@ -104,14 +104,14 @@ namespace PreciseTime
 
 void OnSimulationBegin(SimulationManager@ simManager)
 {
-    _isPluginSelectedByUser = GetVariableString("controller") == PLUGIN_ID;
-    if (!_isPluginSelectedByUser) return;
+    _isPluginCurrentlyUsed = GetVariableString("controller") == PLUGIN_ID;
+    if (!_isPluginCurrentlyUsed) return;
         
     simManager.RemoveStateValidation();
     simManager.InputEvents.RemoveAt(simManager.InputEvents.Length - 1);
 
-    _resultFileName = GetVariableString(SETTING_BASE_REPLAY_NAME);
-    _currentReplayIndex = 1;
+    _baseReplayName = GetVariableString(SETTING_BASE_REPLAY_NAME);
+    _currentReplayIndex = int(GetVariableDouble(SETTING_MIN_REPLAY_INDEX));
 
     PreciseTime::searchPhase = BFPhase::Initial;
     PreciseTime::isEstimating = false;
@@ -119,14 +119,14 @@ void OnSimulationBegin(SimulationManager@ simManager)
     PreciseTime::coeffMax = 18446744073709551615;
     PreciseTime::bestFound = Math::UINT64_MAX;
     
-    int totalInputFiles = MAX_REPLAY_INDEX - MIN_REPLAY_INDEX + 1;
-    Log("Starting precise time extraction for " + totalInputFiles + " input files: " + _resultFileName + MIN_REPLAY_INDEX + ", ... , " + _resultFileName + MAX_REPLAY_INDEX);
+    int totalInputFiles = _maxReplayIndex - _minReplayIndex + 1;
+    Log("Starting precise time extraction for " + totalInputFiles + " input files: " + _baseReplayName + _minReplayIndex + ", ... , " + _baseReplayName + _maxReplayIndex);
     LoadInputsForReplayWithIndex(_currentReplayIndex, simManager);
 }
 
 void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
 {
-    if (!_isPluginSelectedByUser || userCancelled)
+    if (!_isPluginCurrentlyUsed || userCancelled)
     {
         OnSimulationEnd(simManager, 0);
         return;
@@ -140,9 +140,9 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
     SaveInputsToFile(simManager, PreciseTime::lastFound);
     if (PreciseTime::lastFound == PreciseTime::bestFound) _bestReplayIndex = _currentReplayIndex;
     
-    if (++_currentReplayIndex > MAX_REPLAY_INDEX)
+    if (++_currentReplayIndex > _maxReplayIndex)
     {
-        Log("All replays have been processed! Best replay was \"" + _resultFileName + "" + _bestReplayIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
+        Log("All replays have been processed! Best replay was \"" + _baseReplayName + "" + _bestReplayIndex + "\" with time of " + FormatDouble(PreciseTime::bestFound) + ".");
         OnSimulationEnd(simManager, 0);
         return;
     }
@@ -153,15 +153,15 @@ void OnSimulationStep(SimulationManager@ simManager, bool userCancelled)
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int count, int target)
 {
-    if (!_isPluginSelectedByUser) return;
+    if (!_isPluginCurrentlyUsed) return;
     if (simManager.PlayerInfo.RaceFinished) simManager.PreventSimulationFinish();
 }
 
 void OnSimulationEnd(SimulationManager@ simManager, uint result)
 {
-    if (!_isPluginSelectedByUser) return;
+    if (!_isPluginCurrentlyUsed) return;
     
-    _isPluginSelectedByUser = false;
+    _isPluginCurrentlyUsed = false;
     simManager.SetSimulationTimeLimit(0.0);
 }
 
@@ -172,14 +172,14 @@ void SaveInputsToFile(SimulationManager@ simManager, double foundPreciseTime)
     
     commandList.Content = "# Found precise time: " + preciseTime + "\n";
     commandList.Content += simManager.InputEvents.ToCommandsText(InputFormatFlags(3));
-    commandList.Save(_resultFileName + "_" + preciseTime + "_" + _currentReplayIndex + ".txt");
+    commandList.Save(_baseReplayName + "_" + preciseTime + "_" + _currentReplayIndex + ".txt");
     
-    Log("Saved precise time for input file \"" + _resultFileName + "" + _currentReplayIndex + "\": " + preciseTime, Severity::Success);
+    Log("Saved precise time for input file \"" + _baseReplayName + "" + _currentReplayIndex + "\": " + preciseTime, Severity::Success);
 }
 
 void LoadInputsForReplayWithIndex(int index, SimulationManager@ simManager)
 {
-    CommandList commandList(_resultFileName + _currentReplayIndex + ".txt");
+    CommandList commandList(_baseReplayName + _currentReplayIndex + ".txt");
     commandList.Process(CommandListProcessOption::ExecuteImmediately);
     SetCurrentCommandList(commandList);
     simManager.InputEvents.Clear();
@@ -203,32 +203,35 @@ string FormatDouble(double value)
     return Text::FormatFloat(value, "", 0, precision);
 }
 
-void RenderSettings()
-{
-    UI::Dummy(vec2(0, 15));
-
-    UI::TextDimmed("Options:");
-
-    UI::Dummy(vec2(0, 15));
-    UI::Separator();
-    UI::Dummy(vec2(0, 15));
-
-    UI::PushItemWidth(150);
-    if (!_isPluginSelectedByUser)
-    {
-        _resultFileName = UI::InputTextVar("File name", SETTING_BASE_REPLAY_NAME);
-    }
-    else
-    {
-        UI::Text("File name " + _resultFileName);
-    }
-    UI::PopItemWidth();
-}
-
 void Main()
 {
     RegisterVariable(SETTING_BASE_REPLAY_NAME, "track");
+    RegisterVariable(SETTING_MIN_REPLAY_INDEX, 1);
+    RegisterVariable(SETTING_MAX_REPLAY_INDEX, 5);
+    
     RegisterValidationHandler(PLUGIN_ID, "fic's Precise Time Extractor", RenderSettings);
+}
+
+void RenderSettings()
+{
+    UI::Dummy(vec2(0, 8));
+    UI::TextDimmed("Settings");
+    UI::Dummy(vec2(0, 2));
+    UI::Separator();
+    UI::Dummy(vec2(0, 2));
+
+    if (_isPluginCurrentlyUsed)
+    {
+        UI::Text("Base Replay Name: " + _baseReplayName);
+        UI::Text("Min Replay Index: " + _minReplayIndex);
+        UI::Text("Max Replay Index: " + _maxReplayIndex);
+    }
+    else
+    {
+        _baseReplayName = UI::InputTextVar("Base Replay Name", SETTING_BASE_REPLAY_NAME);
+        _minReplayIndex = UI::InputIntVar("Min Replay Index", SETTING_MIN_REPLAY_INDEX);
+        _maxReplayIndex = UI::InputIntVar("Max Replay Index", SETTING_MAX_REPLAY_INDEX);
+    }
 }
 
 PluginInfo@ GetPluginInfo()
